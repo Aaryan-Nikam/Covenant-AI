@@ -1,4 +1,7 @@
-# AgentComply — Full System Architecture & Coding Agent Prompt
+# Ironpass — Full System Architecture & Coding Agent Prompt
+
+> Note: parts of this architecture document still use the earlier working name "AgentComply".
+> In this repository, the project is presented as **Ironpass**.
 
 > **This document is the single source of truth for building AgentComply.**
 > Every component, every spec, every decision is documented here.
