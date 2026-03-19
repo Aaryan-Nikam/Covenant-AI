@@ -11,11 +11,11 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from dashboard.backend.service import DashboardService
-from engine.dependencies import get_db
+from engine.dependencies import get_db, verify_dashboard_api_key
 
 logger = logging.getLogger("ironpass.dashboard.router")
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(verify_dashboard_api_key)])
 
 
 @router.get("/overview", summary="Dashboard overview stats")

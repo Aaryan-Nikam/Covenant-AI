@@ -8,7 +8,7 @@ Uses pydantic-settings for validation and type coercion.
 from functools import lru_cache
 
 from pydantic_settings import BaseSettings
-from pydantic import Field
+from pydantic import AliasChoices, Field
 
 
 class Settings(BaseSettings):
@@ -43,6 +43,19 @@ class Settings(BaseSettings):
     pseudonym_secret_key: str = Field(
         ...,
         description="64 hex chars — secret for deterministic pseudonym generation",
+    )
+    proxy_api_key: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("IRONPASS_PROXY_API_KEY", "PROXY_API_KEY"),
+        description="Exact bearer token required to access Ironpass proxy endpoints",
+    )
+    dashboard_api_key: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "IRONPASS_DASHBOARD_API_KEY",
+            "DASHBOARD_API_KEY",
+        ),
+        description="Exact bearer token required to access dashboard endpoints",
     )
 
     # -----------------------------------------------------------------------
