@@ -1,0 +1,42 @@
+# Ironpass — Production Docker Compose (placeholder)
+# To be configured for production deployment
+version: '3.9'
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.prod
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    depends_on:
+      - db
+      - redis
+    restart: always
+
+  dashboard:
+    build:
+      context: ./dashboard/frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api
+    restart: always
+
+  db:
+    image: postgres:15
+    env_file:
+      - .env
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: always
+
+  redis:
+    image: redis:7-alpine
+    restart: always
+
+volumes:
+  postgres_data:

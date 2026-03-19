@@ -1,0 +1,80 @@
+ruleset_id: pci_dss
+name: "PCI-DSS v4.0"
+version: "4.0"
+industry: finance
+description: "Payment Card Industry Data Security Standard v4.0. Protects cardholder data."
+
+detectors:
+  - id: visa_card
+    name: "Visa Card Number"
+    data_type: credit_card
+    layer: 1
+    patterns:
+      - '(?:\b|(?:^|\D))(4(?:[ \-\.%&#x;]*\d){12,18})(?=\D|\b|$)'
+    confidence_threshold: 0.95
+
+  - id: mastercard
+    name: "Mastercard Number"
+    data_type: credit_card
+    layer: 1
+    patterns:
+      - '(?:\b|(?:^|\D))((?:5[1-5]|2[2-7])(?:[ \-\.%&#x;]*\d){14})(?=\D|\b|$)'
+    confidence_threshold: 0.95
+
+  - id: amex_card
+    name: "American Express Card Number"
+    data_type: credit_card
+    layer: 1
+    patterns:
+      - '(?:\b|(?:^|\D))(3[47](?:[ \-\.%&#x;]*\d){13})(?=\D|\b|$)'
+    confidence_threshold: 0.95
+
+  - id: discover_card
+    name: "Discover Card Number"
+    data_type: credit_card
+    layer: 1
+    patterns:
+      - '(?:\b|(?:^|\D))(6(?:011|5[0-9]{2})(?:[ \-\.%&#x;]*\d){12})(?=\D|\b|$)'
+    confidence_threshold: 0.95
+
+  - id: cvv
+    name: "Card Verification Value"
+    data_type: cvv
+    layer: 1
+    patterns:
+      - '(?i)(?:cvv|cvc|cid|security code)[^\d]{0,10}?(\b[0-9]{3,4}\b)'
+    confidence_threshold: 0.7
+
+  - id: card_expiry
+    name: "Card Expiry Date"
+    data_type: card_expiry
+    layer: 1
+    patterns:
+      - '(?i)(?:exp(?:iry|ires)?|valid thru|expires)[^\d]{0,10}?(\b(0[1-9]|1[0-2])(?:\s*|/|-|\\|\.)?([0-9]{2}|[0-9]{4})\b)'
+      - '(?<=\b)(0[1-9]|1[0-2])(?:\s*|/|-|\\|\.)?([0-9]{2}|[0-9]{4})(?=\b)'
+    confidence_threshold: 0.8
+
+actions:
+  credit_card:
+    primary: tokenize
+    fallback: block
+    log_level: critical
+
+  cvv:
+    primary: block
+    fallback: block
+    log_level: critical
+
+  card_expiry:
+    primary: mask
+    fallback: block
+    log_level: high
+
+audit:
+  retention_days: 365
+  required_fields:
+    - timestamp
+    - agent_id
+    - data_type
+    - action_taken
+    - request_hash

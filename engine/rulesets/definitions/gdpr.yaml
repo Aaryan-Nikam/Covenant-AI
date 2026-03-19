@@ -1,0 +1,90 @@
+ruleset_id: gdpr
+name: "GDPR"
+version: "2018"
+industry: general
+description: "General Data Protection Regulation. Protects EU personal data."
+
+detectors:
+  - id: email
+    name: "Email Address"
+    data_type: email
+    layer: 1
+    patterns:
+      - '\b[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Z|a-z]{2,}\b'
+    confidence_threshold: 0.99
+
+  - id: eu_phone
+    name: "EU Phone Number"
+    data_type: phone_number
+    layer: 1
+    patterns:
+      - '\b(\+?3[0-9]|0)[0-9\s\-]{7,14}\b'
+    confidence_threshold: 0.85
+
+  - id: passport
+    name: "Passport Number"
+    data_type: passport
+    layer: 1
+    patterns:
+      - '\b[A-Z]{1,2}[0-9]{6,9}\b'
+    confidence_threshold: 0.8
+
+  - id: iban
+    name: "IBAN Bank Account"
+    data_type: bank_account
+    layer: 1
+    patterns:
+      - '\b[A-Z]{2}[0-9]{2}[A-Z0-9]{4}[0-9]{7}([A-Z0-9]?){0,16}\b'
+    confidence_threshold: 0.95
+
+  - id: eu_person_name
+    name: "EU Data Subject Name"
+    data_type: person_name
+    layer: 3
+    entity_class: PERSON
+    context_required:
+      keywords:
+        - customer
+        - user
+        - subscriber
+        - resident
+        - citizen
+        - data subject
+        - personal data
+    confidence_threshold: 0.8
+
+actions:
+  email:
+    primary: mask
+    fallback: block
+    log_level: high
+
+  phone_number:
+    primary: mask
+    fallback: block
+    log_level: high
+
+  passport:
+    primary: tokenize
+    fallback: block
+    log_level: critical
+
+  bank_account:
+    primary: tokenize
+    fallback: block
+    log_level: critical
+
+  person_name:
+    primary: pseudonymize
+    fallback: mask
+    log_level: medium
+
+audit:
+  retention_days: 1095
+  required_fields:
+    - timestamp
+    - agent_id
+    - data_type
+    - action_taken
+    - request_hash
+    - data_subject_region

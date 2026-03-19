@@ -1,0 +1,33 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Python dependencies
+COPY engine/requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Download spaCy model
+RUN python -m spacy download en_core_web_lg
+
+# Copy application code
+COPY engine/ ./engine/
+
+# No .env files in image — all config from environment variables
+# No dev dependencies
+# No --reload flag
+
+# Run with Gunicorn + Uvicorn workers
+CMD ["gunicorn", "engine.main:app", \
+    "--workers", "4", \
+    "--worker-class", "uvicorn.workers.UvicornWorker", \
+    "--bind", "0.0.0.0:8000", \
+    "--timeout", "60", \
+    "--graceful-timeout", "30", \
+    "--access-logfile", "-", \
+    "--error-logfile", "-", \
+    "--log-level", "info"]

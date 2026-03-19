@@ -1,0 +1,289 @@
+"""
+Ironpass — Proxy Interceptor.
+
+The main compliance pipeline. Every agent request flows through here:
+
+1. DETECT — Run detection engine on content
+2. ACT — Apply actions (tokenize/mask/block/pseudonymize) 
+3. FORWARD — Forward sanitized content to target LLM
+4. LOG — Audit log (background, never blocks response)
+
+Architecture doc reference: Component 1 — Proxy Router & Interceptor.
+
+Critical Rule #6: Audit writes are background tasks.
+Critical Rule #7: Block is immediate — stops pipeline.
+Critical Rule #8: Pipeline must complete in <200ms for regex/mask.
+"""
+
+import hashlib
+import logging
+import time
+
+import httpx
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from engine.actions.executor import ActionExecutor, ExecutionResult
+from engine.audit.logger import AuditLogger
+from engine.detection.engine import DetectionEngine
+from engine.detection.models import ActionTaken, Detection
+from engine.exceptions import ComplianceViolation
+from engine.proxy.request_model import (
+    ActionSummary,
+    BlockedResponse,
+    DetectionSummary,
+    ProxyResponse,
+)
+from engine.rulesets.registry import RulesetRegistry
+
+logger = logging.getLogger("ironpass.proxy.interceptor")
+
+
+class ProxyInterceptor:
+    """
+    The core compliance proxy pipeline.
+    Detect → Act → Forward → Log.
+    """
+
+    def __init__(
+        self,
+        detection_engine: DetectionEngine,
+        action_executor: ActionExecutor,
+        ruleset_registry: RulesetRegistry,
+        db_session: AsyncSession,
+    ):
+        self.detection_engine = detection_engine
+        self.action_executor = action_executor
+        self.ruleset_registry = ruleset_registry
+        self.audit_logger = AuditLogger(db_session)
+
+    async def process_request(
+        self,
+        content: str,
+        target_url: str,
+        agent_id: str,
+        active_rulesets: list[str],
+        headers: dict[str, str] | None = None,
+        method: str = "POST",
+    ) -> ProxyResponse | BlockedResponse:
+        """
+        Full compliance pipeline:
+        1. DETECT — Scan content for sensitive data
+        2. ACT — Apply actions from ruleset config
+        3. FORWARD — Send sanitized content to target
+        4. LOG — Audit log (background)
+        """
+        start_time = time.monotonic()
+        detections: list[Detection] = []
+        actions_taken: list[ActionTaken] = []
+        was_blocked = False
+        target_status_code = None
+        target_response = None
+        outcome = "passed"
+
+        try:
+            # ---- STEP 1: DETECT ----
+            detections = await self.detection_engine.scan(
+                content=content,
+                active_rulesets=active_rulesets,
+            )
+
+            if not detections:
+                # No detections — forward as-is
+                logger.debug(f"No detections — forwarding to {target_url}")
+                target_status_code, target_response = await self._forward(
+                    content=content,
+                    target_url=target_url,
+                    headers=headers or {},
+                    method=method,
+                )
+                outcome = "passed"
+
+            else:
+                # ---- STEP 2: ACT ----
+                merged_actions = self.ruleset_registry.get_merged_actions(
+                    active_rulesets
+                )
+
+                result: ExecutionResult = await self.action_executor.execute(
+                    content=content,
+                    detections=detections,
+                    ruleset_actions=merged_actions,
+                    agent_id=agent_id,
+                )
+                actions_taken = result.actions_taken
+
+                # ---- STEP 3: FORWARD (sanitized content) ----
+                target_status_code, target_response = await self._forward(
+                    content=result.modified_content,
+                    target_url=target_url,
+                    headers=headers or {},
+                    method=method,
+                )
+                outcome = "sanitized"
+
+        except ComplianceViolation as violation:
+            # ---- BLOCKED ----
+            was_blocked = True
+            outcome = "blocked"
+            latency_ms = int((time.monotonic() - start_time) * 1000)
+
+            logger.warning(
+                f"Request BLOCKED: {violation.data_type} by "
+                f"{violation.ruleset_id}/{violation.detector_id}"
+            )
+
+            # Log the blocked request (background)
+            audit_entry_id = await self._log_audit(
+                agent_id=agent_id,
+                request_content=content,
+                rulesets_used=active_rulesets,
+                detections=detections,
+                actions_taken=actions_taken,
+                was_blocked=True,
+                target_url=target_url,
+                latency_ms=latency_ms,
+                outcome=outcome,
+            )
+
+            return BlockedResponse(
+                error=str(violation),
+                data_type=violation.data_type,
+                ruleset_id=violation.ruleset_id,
+                detector_id=violation.detector_id,
+                audit_entry_id=audit_entry_id,
+            )
+
+        # ---- STEP 4: LOG (always, regardless of outcome) ----
+        latency_ms = int((time.monotonic() - start_time) * 1000)
+
+        audit_entry_id = await self._log_audit(
+            agent_id=agent_id,
+            request_content=content,
+            rulesets_used=active_rulesets,
+            detections=detections,
+            actions_taken=actions_taken,
+            was_blocked=was_blocked,
+            target_url=target_url,
+            latency_ms=latency_ms,
+            outcome=outcome,
+        )
+
+        # Build response
+        detection_summaries = [
+            DetectionSummary(
+                detector_id=d.detector_id,
+                data_type=d.data_type,
+                position=list(d.position),
+                confidence=d.confidence,
+                layer=d.layer,
+                ruleset_id=d.ruleset_id,
+            )
+            for d in detections
+        ]
+
+        action_summaries = [
+            ActionSummary(
+                detector_id=a.detector_id,
+                data_type=a.data_type,
+                action=a.action,
+                ruleset_id=a.ruleset_id,
+                log_level=a.log_level,
+            )
+            for a in actions_taken
+        ]
+
+        return ProxyResponse(
+            status=outcome,
+            target_status_code=target_status_code,
+            target_response=target_response,
+            detections_count=len(detections),
+            detections=detection_summaries,
+            actions_taken=action_summaries,
+            audit_entry_id=audit_entry_id,
+            latency_ms=latency_ms,
+        )
+
+    async def _forward(
+        self,
+        content: str,
+        target_url: str,
+        headers: dict[str, str],
+        method: str,
+    ) -> tuple[int, str]:
+        """
+        Forward (sanitized) content to the target LLM API.
+        Returns (status_code, response_body).
+        """
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                if method.upper() == "POST":
+                    response = await client.post(
+                        target_url,
+                        content=content,
+                        headers={
+                            "Content-Type": "application/json",
+                            **headers,
+                        },
+                    )
+                elif method.upper() == "GET":
+                    response = await client.get(
+                        target_url,
+                        headers=headers,
+                    )
+                else:
+                    response = await client.request(
+                        method.upper(),
+                        target_url,
+                        content=content,
+                        headers={
+                            "Content-Type": "application/json",
+                            **headers,
+                        },
+                    )
+
+                return response.status_code, response.text
+
+        except httpx.TimeoutException:
+            logger.error(f"Target timeout: {target_url}")
+            return 504, '{"error": "Target API timeout"}'
+        except httpx.ConnectError:
+            logger.error(f"Target unreachable: {target_url}")
+            return 502, '{"error": "Target API unreachable"}'
+        except Exception as e:
+            logger.error(f"Forward error: {e}")
+            return 500, f'{{"error": "Proxy forward error: {str(e)}"}}'
+
+    async def _log_audit(
+        self,
+        agent_id: str,
+        request_content: str,
+        rulesets_used: list[str],
+        detections: list[Detection],
+        actions_taken: list[ActionTaken],
+        was_blocked: bool,
+        target_url: str,
+        latency_ms: int,
+        outcome: str,
+    ) -> str | None:
+        """
+        Log to audit trail. Runs as background task.
+        Never blocks the proxy response (Critical Rule #6).
+        Returns entry_id or None on failure.
+        """
+        try:
+            entry_id = await self.audit_logger.log_request(
+                agent_id=agent_id,
+                request_content=request_content,
+                rulesets_used=rulesets_used,
+                detections=detections,
+                actions_taken=actions_taken,
+                was_blocked=was_blocked,
+                target_url=target_url,
+                latency_ms=latency_ms,
+                outcome=outcome,
+            )
+            return entry_id
+        except Exception as e:
+            # Audit failure should NEVER block the proxy
+            logger.error(f"Audit logging failed (non-blocking): {e}")
+            return None

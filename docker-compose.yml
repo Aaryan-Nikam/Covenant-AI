@@ -1,0 +1,43 @@
+version: '3.9'
+
+services:
+  api:
+    build: ./engine
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://ironpass:secret@db:5432/ironpass
+      - REDIS_URL=redis://redis:6379/0
+      - KEY_BACKEND=local
+      - APP_ENV=development
+    depends_on:
+      - db
+      - redis
+    volumes:
+      - ./engine:/app
+
+  dashboard:
+    build: ./dashboard/frontend
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api
+
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: ironpass
+      POSTGRES_USER: ironpass
+      POSTGRES_PASSWORD: secret
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+volumes:
+  postgres_data:
