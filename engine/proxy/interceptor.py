@@ -61,6 +61,7 @@ class ProxyInterceptor:
         content: str,
         target_url: str,
         agent_id: str,
+        tenant_id: str,
         active_rulesets: list[str],
         headers: dict[str, str] | None = None,
         method: str = "POST",
@@ -109,6 +110,7 @@ class ProxyInterceptor:
                     detections=detections,
                     ruleset_actions=merged_actions,
                     agent_id=agent_id,
+                    tenant_id=tenant_id,
                 )
                 actions_taken = result.actions_taken
 
@@ -201,6 +203,8 @@ class ProxyInterceptor:
             actions_taken=action_summaries,
             audit_entry_id=audit_entry_id,
             latency_ms=latency_ms,
+            sanitized_content=result.modified_content if 'result' in locals() else content,
+            session_token_map=result.session_token_map if 'result' in locals() else {},
         )
 
     async def _forward(
@@ -287,3 +291,42 @@ class ProxyInterceptor:
             # Audit failure should NEVER block the proxy
             logger.error(f"Audit logging failed (non-blocking): {e}")
             return None
+
+    async def process_response(
+        self,
+        response_content: str,
+        session_token_map: dict[str, str],
+        agent_id: str,
+    ) -> str:
+        """
+        De-tokenize the OpenAI response before returning it to the agent.
+
+        Scans response_content for any TOK_* tokens present in session_token_map
+        and replaces them with their display-safe values.
+
+        Examples:
+            TOK_CARD_a4f2b891  →  ****4242
+            TOK_SSN_c3d1e2f0   →  [SSN PROTECTED]
+            TOK_NAME_b7a9c011  →  John Smith
+
+        This runs synchronously — we must de-tokenize before returning
+        the response to the agent (unlike audit writes which are background).
+        """
+        if not session_token_map:
+            return response_content
+
+        detokenized = response_content
+        replaced_count = 0
+
+        for token, display_value in session_token_map.items():
+            if token in detokenized:
+                detokenized = detokenized.replace(token, display_value)
+                replaced_count += 1
+
+        if replaced_count > 0:
+            logger.debug(
+                f"De-tokenized {replaced_count} token(s) in response "
+                f"(agent={agent_id})"
+            )
+
+        return detokenized

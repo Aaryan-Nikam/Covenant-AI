@@ -117,7 +117,8 @@ class Settings(BaseSettings):
     )
     api_port: int = Field(
         default=8000,
-        description="API server port",
+        validation_alias="PORT",          # Railway injects $PORT
+        description="API server port (Railway: PORT, local: API_PORT)",
     )
 
     # -----------------------------------------------------------------------
@@ -136,10 +137,23 @@ class Settings(BaseSettings):
         description="spaCy NER model name (must be downloaded before start)",
     )
 
+    # -----------------------------------------------------------------------
+    # Admin API
+    # -----------------------------------------------------------------------
+    ironpass_admin_secret: str = Field(
+        default="",
+        description=(
+            "Master key for the /v1/admin/ API. "
+            "Set IRONPASS_ADMIN_SECRET in Railway. "
+            "If empty, all admin requests are rejected with 503."
+        ),
+    )
+
     model_config = {
         "env_file": ".env",
         "env_file_encoding": "utf-8",
         "case_sensitive": False,
+        "extra": "ignore",
     }
 
     @property

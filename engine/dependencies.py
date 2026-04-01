@@ -41,16 +41,13 @@ def get_config() -> Settings:
     return get_settings()
 
 
-security = HTTPBearer(auto_error=False)
+from fastapi import Security
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
+from engine.auth.models import Tenant
+from engine.auth.service import authenticate_request
 
-@dataclass
-class Tenant:
-    id: str
-    name: str
-    agent_id: str
-    active_rulesets: list[str]
-
+security = HTTPBearer()
 
 def _require_bearer_token(
     credentials: HTTPAuthorizationCredentials | None,
@@ -76,28 +73,16 @@ def _require_configured_token(
 
 
 async def verify_api_key(
-    credentials: HTTPAuthorizationCredentials | None = Security(security),
-    settings: Settings = Depends(get_config),
+    credentials: HTTPAuthorizationCredentials = Security(security),
+    db: AsyncSession = Depends(get_db),
 ) -> Tenant:
     """
-    Verifies the exact bearer token required to access proxy endpoints.
-    The implementation is still single-tenant, but it now fails closed
-    unless a configured token matches exactly.
-    """
-    token = _require_bearer_token(credentials)
-    _require_configured_token(
-        token,
-        settings.proxy_api_key,
-        missing_detail="Ironpass proxy API key is not configured",
-        invalid_detail="Invalid Ironpass API key",
-    )
+    Authenticates the request by hashing the bearer token and looking
+    it up in the tenant_api_keys table. Returns the associated Tenant.
 
-    return Tenant(
-        id="tenant_123",
-        name="Acme Corp",
-        agent_id="acme_main_agent",
-        active_rulesets=["pci_dss", "hipaa"],
-    )
+    Raises HTTP 401 for any invalid/expired/revoked key.
+    """
+    return await authenticate_request(raw_key=credentials.credentials, db=db)
 
 
 async def verify_dashboard_api_key(
@@ -118,8 +103,7 @@ async def verify_dashboard_api_key(
 _ruleset_registry: RulesetRegistry | None = None
 _detection_engine: DetectionEngine | None = None
 
-
-def _get_registry() -> RulesetRegistry:
+def get_registry() -> RulesetRegistry:
     global _ruleset_registry
     if _ruleset_registry is None:
         from engine.rulesets.loader import RulesetLoader
@@ -134,13 +118,13 @@ def _get_registry() -> RulesetRegistry:
 def _get_detection_engine() -> DetectionEngine:
     global _detection_engine
     if _detection_engine is None:
-        _detection_engine = DetectionEngine(_get_registry())
+        _detection_engine = DetectionEngine(get_registry())
     return _detection_engine
 
 
 def get_interceptor(db: AsyncSession = Depends(get_db)) -> ProxyInterceptor:
     """Injected proxy interceptor with DB."""
-    registry = _get_registry()
+    registry = get_registry()
     detection_engine = _get_detection_engine()
 
     from engine.actions.executor import ActionExecutor
