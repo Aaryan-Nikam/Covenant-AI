@@ -1,0 +1,105 @@
+/* ── Login screen ──────────────────────────────── */
+.ip-login-page {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  background: var(--bg-canvas);
+  font-family: var(--font-sans);
+}
+
+.ip-login-container {
+  width: 100%;
+  max-width: 400px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: 12px;
+  padding: 40px;
+  box-shadow: 0 4px 24px -12px rgba(0, 0, 0, 0.05);
+}
+
+.ip-login-header {
+  text-align: center;
+  margin-bottom: 32px;
+}
+
+.ip-login-logo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.ip-login-logo-text {
+  font-family: var(--font-serif);
+  font-size: 22px;
+  font-weight: 400;
+  color: var(--text-primary);
+  letter-spacing: 0;
+}
+
+.ip-login-title {
+  font-size: 20px;
+  font-weight: 500;
+  color: var(--text-primary);
+  margin-bottom: 6px;
+}
+
+.ip-login-subtitle {
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.ip-login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.ip-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ip-form-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-primary);
+  letter-spacing: 0.02em;
+}
+
+.ip-login-btn {
+  background: var(--text-primary);
+  color: var(--bg-surface);
+  border: none;
+  border-radius: 6px;
+  padding: 10px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  margin-top: 8px;
+  transition: opacity 0.15s;
+}
+
+.ip-login-btn:hover {
+  opacity: 0.85;
+}
+
+.ip-login-footer {
+  margin-top: 24px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+
+.ip-login-footer a {
+  color: var(--text-secondary);
+  text-decoration: none;
+  margin-left: 4px;
+}
+
+.ip-login-footer a:hover {
+  color: var(--text-primary);
+}

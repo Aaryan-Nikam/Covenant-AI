@@ -12,17 +12,19 @@ import { Reports } from "./components/mockups/ironpass/Reports";
 import { ApiKeys } from "./components/mockups/ironpass/ApiKeys";
 import { Team } from "./components/mockups/ironpass/Team";
 import { Settings } from "./components/mockups/ironpass/Settings";
+import { Login } from "./components/mockups/ironpass/Login";
 
 function App() {
-  const [route, setRoute] = useState(() => window.location.hash.slice(1) || "dashboard");
+  const [route, setRoute] = useState(() => window.location.hash.slice(1) || "login");
 
   useEffect(() => {
-    const handleHashChange = () => setRoute(window.location.hash.slice(1) || "dashboard");
+    const handleHashChange = () => setRoute(window.location.hash.slice(1) || "login");
     window.addEventListener("hashchange", handleHashChange);
     return () => window.removeEventListener("hashchange", handleHashChange);
   }, []);
 
   switch (route) {
+    case "login": return <Login />;
     case "dashboard": return <Dashboard />;
     case "audit": return <AuditLog />;
     case "violations": return <Violations />;
@@ -36,7 +38,7 @@ function App() {
     case "api-keys": return <ApiKeys />;
     case "team": return <Team />;
     case "settings": return <Settings />;
-    default: return <Dashboard />;
+    default: return <Login />;
   }
 }
 
