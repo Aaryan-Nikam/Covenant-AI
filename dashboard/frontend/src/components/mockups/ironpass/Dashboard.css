@@ -1,0 +1,250 @@
+/* ── Date range controls ─────────────────────── */
+.ip-date-range-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.ip-date-range-pill {
+  font-size: 12px;
+  padding: 5px 12px;
+}
+
+.ip-date-tab {
+  background: none;
+  border: none;
+  font-size: 13px;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  padding: 5px 10px;
+  border-radius: 5px;
+  font-family: var(--font-sans);
+  transition: background 0.1s, color 0.1s;
+}
+.ip-date-tab:hover { color: var(--text-primary); background: var(--bg-elevated); }
+.ip-date-tab--active {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+/* ── KPI Row ─────────────────────────────────── */
+.ip-kpi-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.ip-kpi-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ip-kpi-label {
+  font-size: 13px;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ip-kpi-value {
+  font-size: 32px;
+  font-weight: 500;
+  color: var(--text-primary);
+  line-height: 1.15;
+  font-family: var(--font-sans);
+}
+
+.ip-kpi-delta {
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+.ip-kpi-delta--up { color: var(--status-passed-text); }
+.ip-kpi-delta--down { color: var(--status-blocked-text); }
+
+/* ── Charts Row ──────────────────────────────── */
+.ip-charts-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 32px;
+}
+
+.ip-chart-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+.ip-chart-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 20px 20px 12px;
+}
+
+.ip-chart-title {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+}
+
+.ip-chart-count {
+  font-size: 28px;
+  font-weight: 500;
+  color: var(--text-primary);
+  line-height: 1.2;
+}
+
+.ip-chart-body {
+  padding: 0 16px;
+  flex: 1;
+}
+
+.ip-chart-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 20px 16px;
+  border-top: 1px solid var(--border-default);
+  margin-top: 12px;
+}
+
+.ip-chart-legend {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.ip-legend-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.ip-chart-breakdown {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.ip-latency-legend {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.ip-latency-legend span {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* ── Bar chart ───────────────────────────────── */
+.ip-bar-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  height: 120px;
+  padding-bottom: 20px;
+}
+
+.ip-bar-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  height: 100%;
+}
+
+.ip-bar-wrap {
+  flex: 1;
+  display: flex;
+  align-items: flex-end;
+  width: 100%;
+}
+
+.ip-bar {
+  width: 100%;
+  background: var(--accent-primary);
+  border-radius: 2px 2px 0 0;
+  opacity: 0.85;
+  min-height: 2px;
+  transition: opacity 0.1s;
+}
+.ip-bar:hover { opacity: 1; }
+
+.ip-bar-label {
+  font-size: 10px;
+  color: var(--text-tertiary);
+  font-family: var(--font-mono);
+}
+
+/* ── Explore ─────────────────────────────────── */
+.ip-explore-heading {
+  font-family: var(--font-serif);
+  font-size: 20px;
+  font-weight: 400;
+  color: var(--text-primary);
+  margin-bottom: 16px;
+}
+
+.ip-explore-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+}
+
+.ip-explore-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ip-explore-card-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ip-explore-icon {
+  font-size: 16px;
+  color: var(--text-secondary);
+}
+
+.ip-explore-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.ip-explore-tag {
+  background: var(--accent-subtle);
+  color: var(--accent-primary);
+  font-size: 11px;
+  font-weight: 500;
+  padding: 1px 7px;
+  border-radius: 10px;
+  margin-left: 2px;
+}
+
+.ip-explore-desc {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.55;
+}

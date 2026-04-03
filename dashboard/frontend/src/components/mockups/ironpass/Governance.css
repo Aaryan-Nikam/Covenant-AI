@@ -1,0 +1,164 @@
+.ip-tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--border-default);
+  margin-bottom: 24px;
+}
+
+.ip-tab {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: 10px 16px;
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-family: var(--font-sans);
+  margin-bottom: -1px;
+  transition: color 0.1s;
+}
+.ip-tab:hover { color: var(--text-primary); }
+.ip-tab--active {
+  color: var(--text-primary);
+  font-weight: 500;
+  border-bottom-color: var(--text-primary);
+}
+
+.ip-tab-content {}
+
+/* ── Changelog ───────────────────────────────── */
+.ip-changelog {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.ip-changelog-event {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--border-default);
+}
+.ip-changelog-event:last-child { border-bottom: none; }
+
+.ip-cl-date-col {
+  width: 56px;
+  flex-shrink: 0;
+}
+
+.ip-cl-date {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.ip-cl-time {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  font-family: var(--font-mono);
+}
+
+.ip-cl-avatar {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.ip-cl-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ip-cl-action {
+  font-size: 13px;
+  color: var(--text-primary);
+  line-height: 1.5;
+  padding-top: 2px;
+}
+
+.ip-cl-diff-btn {
+  background: none;
+  border: none;
+  font-size: 12px;
+  color: var(--accent-primary);
+  cursor: pointer;
+  padding: 0;
+  font-family: var(--font-sans);
+  text-align: left;
+}
+.ip-cl-diff-btn:hover { color: var(--accent-hover); }
+
+.ip-diff-block {
+  background: #1A1A1A;
+  border-radius: 6px;
+  padding: 12px 14px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ip-diff-line { padding: 1px 0; }
+.ip-diff-remove { color: #F87171; }
+.ip-diff-add { color: #4ADE80; }
+.ip-diff-ctx { color: #94A3B8; }
+
+/* ── Config snapshot ─────────────────────────── */
+.ip-snapshot {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.ip-snapshot-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.ip-snapshot-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+.ip-snapshot-row {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  gap: 20px;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--border-default);
+  align-items: baseline;
+}
+.ip-snapshot-row:last-child { border-bottom: none; }
+
+.ip-snapshot-label {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.ip-snapshot-value {
+  font-size: 13px;
+  color: var(--text-primary);
+}

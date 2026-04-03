@@ -1,0 +1,97 @@
+.ip-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.2);
+  z-index: 100;
+}
+
+.ip-modal {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 480px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: 10px;
+  z-index: 101;
+  animation: modalIn 0.15s ease-out;
+  overflow: hidden;
+}
+
+@keyframes modalIn {
+  from { opacity: 0; transform: translate(-50%, -50%) scale(0.97); }
+  to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+
+.ip-modal-header {
+  padding: 20px 24px 16px;
+  border-bottom: 1px solid var(--border-default);
+}
+
+.ip-modal-body {
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.ip-modal-footer {
+  padding: 16px 24px;
+  border-top: 1px solid var(--border-default);
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.ip-modal-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ip-modal-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.ip-radio-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ip-radio {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.ip-radio input {
+  accent-color: var(--text-primary);
+}
+
+.ip-key-reveal-box {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #FFFBEB;
+  border: 1px solid #F59E0B;
+  border-radius: 6px;
+  padding: 10px 14px;
+}
+
+.ip-key-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  background: var(--status-masked-bg);
+  border-radius: 6px;
+  padding: 12px;
+}

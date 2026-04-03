@@ -1,0 +1,142 @@
+.ip-callout {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid var(--border-default);
+  border-radius: 8px;
+  padding: 14px 16px;
+  margin-bottom: 24px;
+  background: var(--bg-surface);
+}
+
+.ip-callout-content {}
+
+.ip-callout-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.ip-callout-body {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.ip-callout-dismiss {
+  background: none;
+  border: none;
+  font-size: 16px;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+  line-height: 1;
+}
+.ip-callout-dismiss:hover { color: var(--text-primary); }
+
+.ip-guardrail-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 32px;
+}
+
+.ip-guardrail-section-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.ip-guardrail-divider {
+  border: none;
+  border-top: 1px solid var(--border-default);
+  margin-bottom: 32px;
+}
+
+.ip-guardrail-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  transition: opacity 0.2s;
+}
+
+.ip-guardrail-card--disabled {
+  opacity: 0.6;
+}
+
+.ip-guardrail-header {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ip-guardrail-name-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.ip-guardrail-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.ip-guardrail-header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ip-guardrail-desc {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.ip-guardrail-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.ip-guardrail-check-type {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ip-guardrail-check-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.ip-guardrail-check-label {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.ip-guardrail-latency {
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+
+.ip-guardrail-right-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.ip-guardrail-sep {
+  color: var(--text-tertiary);
+}

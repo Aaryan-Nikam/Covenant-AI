@@ -1,0 +1,136 @@
+.ip-policy-radio-row {
+  display: flex;
+  gap: 20px;
+}
+
+.ip-policy-radio-opt {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.ip-custom-pattern {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ip-policy-threshold {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ip-threshold-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ip-slider {
+  flex: 1;
+  accent-color: var(--text-primary);
+}
+
+.ip-run-calibration {
+  margin-top: 8px;
+  background: none;
+  border: none;
+  font-size: 13px;
+  color: var(--accent-primary);
+  cursor: pointer;
+  font-family: var(--font-sans);
+  padding: 0;
+  text-align: left;
+}
+.ip-run-calibration:hover { color: var(--accent-hover); }
+
+.ip-calibration-result {
+  margin-top: 8px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: 6px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ip-cal-row {
+  font-size: 12px;
+}
+.ip-cal-pass { color: var(--status-passed-text); }
+.ip-cal-fail { color: var(--status-blocked-text); }
+
+.ip-toggle-group-row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: nowrap;
+}
+
+.ip-tg-btn {
+  background: transparent;
+  border: 1px solid var(--border-default);
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-family: var(--font-sans);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.1s;
+  white-space: nowrap;
+}
+.ip-tg-btn:hover { background: var(--bg-elevated); color: var(--text-primary); }
+.ip-tg-btn--active {
+  background: var(--text-primary);
+  color: var(--text-inverse);
+  border-color: var(--text-primary);
+}
+
+.ip-action-options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.ip-action-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-default);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.1s;
+}
+.ip-action-option:hover { background: var(--bg-elevated); }
+.ip-action-option--selected {
+  background: var(--bg-elevated);
+  border-color: var(--border-strong);
+}
+
+.ip-action-option input { margin-top: 2px; accent-color: var(--text-primary); flex-shrink: 0; }
+
+.ip-action-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+  margin-bottom: 2px;
+}
+
+.ip-action-desc {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.ip-live-preview-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+}

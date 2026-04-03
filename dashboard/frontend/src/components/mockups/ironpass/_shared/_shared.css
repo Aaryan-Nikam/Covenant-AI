@@ -1,0 +1,589 @@
+@import './tokens.css';
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-sans);
+  background: var(--bg-canvas);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Shell ───────────────────────────────────── */
+.ip-shell {
+  display: flex;
+  height: 100vh;
+  min-width: 1280px;
+  overflow: hidden;
+  background: var(--bg-canvas);
+}
+
+/* ── Sidebar ─────────────────────────────────── */
+.ip-sidebar {
+  width: 240px;
+  flex-shrink: 0;
+  background: var(--bg-elevated);
+  border-right: 1px solid var(--border-default);
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow-y: auto;
+}
+
+.ip-logo-area {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 56px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--border-default);
+  flex-shrink: 0;
+}
+
+.ip-logo-icon {
+  flex-shrink: 0;
+}
+
+.ip-logo-text {
+  font-family: var(--font-serif);
+  font-size: 16px;
+  font-weight: 400;
+  color: var(--text-primary);
+  letter-spacing: 0;
+}
+
+.ip-nav {
+  flex: 1;
+  padding: 8px 0;
+  overflow-y: auto;
+}
+
+.ip-nav-group {
+  margin-bottom: 4px;
+}
+
+.ip-nav-group-label {
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+  padding: 20px 16px 6px;
+}
+
+.ip-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: calc(100% - 16px);
+  margin: 1px 8px;
+  padding: 7px 8px;
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--text-secondary);
+  border-radius: 5px;
+  border: 1px solid transparent;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  font-family: var(--font-sans);
+  transition: background 0.1s, color 0.1s;
+}
+
+.ip-nav-item:hover {
+  background: var(--bg-surface);
+  color: var(--text-primary);
+}
+
+.ip-nav-item--active {
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font-weight: 500;
+  border-color: var(--border-default);
+}
+
+.ip-nav-accent-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent-primary);
+  flex-shrink: 0;
+}
+
+.ip-nav-badge {
+  margin-left: auto;
+  background: var(--status-blocked-bg);
+  color: var(--status-blocked-text);
+  font-size: 11px;
+  font-weight: 500;
+  padding: 1px 6px;
+  border-radius: 10px;
+}
+
+.ip-system-status {
+  padding: 12px 16px 16px;
+  border-top: 1px solid var(--border-default);
+  flex-shrink: 0;
+}
+
+.ip-status-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 2px;
+}
+
+.ip-status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.ip-status-dot--active {
+  background: var(--status-passed-dot);
+}
+
+.ip-status-dot--error {
+  background: var(--status-blocked-dot);
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.ip-status-label {
+  font-size: 11px;
+  color: var(--text-secondary);
+  letter-spacing: 0.04em;
+}
+
+.ip-status-url {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--text-tertiary);
+  padding-left: 13px;
+}
+
+/* ── Main content area ───────────────────────── */
+.ip-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-width: 0;
+}
+
+/* ── Page header ─────────────────────────────── */
+.ip-page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 56px;
+  padding: 0 32px;
+  border-bottom: 1px solid var(--border-default);
+  flex-shrink: 0;
+}
+
+.ip-page-header-left {}
+
+.ip-page-title {
+  font-family: var(--font-serif);
+  font-size: 24px;
+  font-weight: 400;
+  color: var(--text-primary);
+  line-height: 1.2;
+}
+
+.ip-page-subtitle {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-top: 1px;
+}
+
+.ip-page-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ── Buttons ─────────────────────────────────── */
+.ip-btn-primary {
+  background: var(--text-primary);
+  color: var(--text-inverse);
+  font-size: 13px;
+  font-weight: 500;
+  padding: 8px 16px;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  font-family: var(--font-sans);
+  transition: opacity 0.15s;
+}
+.ip-btn-primary:hover { opacity: 0.85; }
+
+.ip-btn-ghost {
+  background: transparent;
+  color: var(--text-primary);
+  border: 1px solid var(--border-default);
+  font-size: 13px;
+  font-weight: 400;
+  padding: 7px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-family: var(--font-sans);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: background 0.1s;
+}
+.ip-btn-ghost:hover { background: var(--bg-elevated); }
+
+.ip-btn-destructive {
+  background: transparent;
+  color: var(--status-blocked-text);
+  border: 1px solid #FECACA;
+  font-size: 13px;
+  font-weight: 400;
+  padding: 7px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-family: var(--font-sans);
+  transition: background 0.1s;
+}
+.ip-btn-destructive:hover { background: var(--status-blocked-bg); }
+
+/* ── Status badge ────────────────────────────── */
+.ip-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+.ip-badge-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.ip-badge--passed {
+  background: var(--status-passed-bg);
+  color: var(--status-passed-text);
+}
+.ip-badge--passed .ip-badge-dot { background: var(--status-passed-dot); }
+.ip-badge--masked {
+  background: var(--status-masked-bg);
+  color: var(--status-masked-text);
+}
+.ip-badge--masked .ip-badge-dot { background: var(--status-masked-dot); }
+.ip-badge--blocked {
+  background: var(--status-blocked-bg);
+  color: var(--status-blocked-text);
+}
+.ip-badge--blocked .ip-badge-dot { background: var(--status-blocked-dot); }
+.ip-badge--error {
+  background: var(--status-error-bg);
+  color: var(--status-error-text);
+}
+.ip-badge--error .ip-badge-dot { background: var(--status-error-dot); }
+
+/* ── Data type tag ───────────────────────────── */
+.ip-tag {
+  display: inline-flex;
+  align-items: center;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 11px;
+  font-weight: 500;
+  font-family: var(--font-mono);
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+/* ── Table ───────────────────────────────────── */
+.ip-table-container {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.ip-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.ip-table th {
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-secondary);
+  padding: 0 16px 10px 16px;
+  text-align: left;
+  border-bottom: 1px solid var(--border-default);
+  white-space: nowrap;
+}
+
+.ip-table td {
+  font-size: 13px;
+  color: var(--text-primary);
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-default);
+  vertical-align: middle;
+}
+
+.ip-table tbody tr:hover td {
+  background: var(--bg-overlay);
+}
+
+.ip-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.ip-mono {
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+/* ── Page content area ───────────────────────── */
+.ip-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 32px;
+}
+
+/* ── Card ────────────────────────────────────── */
+.ip-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: 12px;
+  padding: 20px;
+}
+
+/* ── Sheet — card with rounded corners for tables/lists ── */
+.ip-sheet {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: 12px;
+  padding: 20px;
+}
+
+/* Tables inside a sheet get rounded overflow */
+.ip-sheet .ip-table-container,
+.ip-sheet table.ip-table {
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+/* First and last row corners */
+.ip-sheet .ip-table tbody tr:first-child td:first-child { border-top-left-radius: 0; }
+.ip-sheet .ip-table tbody tr:first-child td:last-child { border-top-right-radius: 0; }
+
+/* ── Input ───────────────────────────────────── */
+.ip-input {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 14px;
+  font-family: var(--font-sans);
+  color: var(--text-primary);
+  width: 100%;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.ip-input:focus {
+  border-color: var(--border-focus);
+  box-shadow: 0 0 0 2px rgba(0,0,0,0.06);
+}
+
+/* ── Section heading ─────────────────────────── */
+.ip-section-heading {
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-secondary);
+  margin-bottom: 12px;
+}
+
+/* ── Toggle ──────────────────────────────────── */
+.ip-toggle {
+  position: relative;
+  width: 28px;
+  height: 16px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.ip-toggle input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+  position: absolute;
+}
+.ip-toggle-track {
+  position: absolute;
+  inset: 0;
+  border-radius: 8px;
+  background: var(--border-strong);
+  transition: background 0.2s;
+}
+.ip-toggle input:checked ~ .ip-toggle-track {
+  background: var(--accent-primary);
+}
+.ip-toggle-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: white;
+  transition: transform 0.2s;
+  pointer-events: none;
+}
+.ip-toggle input:checked ~ .ip-toggle-thumb {
+  transform: translateX(12px);
+}
+
+/* ── Drawer backdrop ─────────────────────────── */
+.ip-drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.15);
+  z-index: 100;
+}
+
+.ip-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  height: 100vh;
+  background: var(--bg-surface);
+  border-left: 1px solid var(--border-default);
+  z-index: 101;
+  overflow-y: auto;
+  animation: slideInRight 0.2s ease-out;
+}
+
+@keyframes slideInRight {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
+.ip-drawer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border-default);
+  position: sticky;
+  top: 0;
+  background: var(--bg-surface);
+  z-index: 1;
+}
+
+.ip-drawer-close {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: var(--font-sans);
+  padding: 4px 0;
+}
+.ip-drawer-close:hover { color: var(--text-primary); }
+
+.ip-drawer-section {
+  padding: 20px;
+  border-bottom: 1px solid var(--border-default);
+}
+
+/* ── Filter bar ──────────────────────────────── */
+.ip-filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: 8px;
+  padding: 10px 12px;
+  flex-wrap: nowrap;
+  margin-bottom: 20px;
+}
+
+.ip-filter-pill {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 10px;
+  background: transparent;
+  border: 1px solid var(--border-default);
+  border-radius: 6px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-family: var(--font-sans);
+  white-space: nowrap;
+  transition: background 0.1s;
+}
+.ip-filter-pill:hover { background: var(--bg-elevated); }
+
+.ip-filter-search {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--border-default);
+  border-radius: 6px;
+  padding: 5px 10px;
+  background: transparent;
+}
+.ip-filter-search input {
+  border: none;
+  background: none;
+  font-size: 13px;
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  outline: none;
+  width: 180px;
+}
+.ip-filter-search input::placeholder { color: var(--text-tertiary); }
+
+/* ── Latency colors ──────────────────────────── */
+.ip-latency--normal { color: var(--text-primary); }
+.ip-latency--warn { color: var(--status-masked-text); }
+.ip-latency--danger { color: var(--status-blocked-text); }
+
+/* ── Icon button ─────────────────────────────── */
+.ip-icon-btn {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: var(--text-tertiary);
+  font-size: 16px;
+  transition: background 0.1s, color 0.1s;
+}
+.ip-icon-btn:hover {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+}

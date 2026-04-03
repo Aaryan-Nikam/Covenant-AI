@@ -1,0 +1,48 @@
+.ip-agents-summary {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+}
+
+.ip-agent-stat {
+  padding: 16px 20px;
+}
+
+.ip-agent-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.ip-agent-detail-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border-default);
+}
+
+.ip-agent-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+}
+
+.ip-agent-detail-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ip-agent-detail-label {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.ip-agent-detail-value {
+  font-size: 13px;
+  color: var(--text-primary);
+}
