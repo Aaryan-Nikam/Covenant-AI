@@ -58,7 +58,13 @@ const navGroups = [
   },
 ];
 
-export function AppShell({ activePage, children, onNavigate }: AppShellProps) {
+export function AppShell({ children }: AppShellProps) {
+  // Override activePage and onNavigate to use hash routing globally for the mockups
+  const activePage = window.location.hash.slice(1) || "dashboard";
+  const handleNavigate = (page: NavPage) => {
+    window.location.hash = page;
+  };
+
   return (
     <div className="ip-shell">
       <nav className="ip-sidebar">
@@ -78,7 +84,7 @@ export function AppShell({ activePage, children, onNavigate }: AppShellProps) {
                 <button
                   key={item.id}
                   className={`ip-nav-item${activePage === item.id ? " ip-nav-item--active" : ""}`}
-                  onClick={() => onNavigate?.(item.id)}
+                  onClick={() => handleNavigate(item.id)}
                 >
                   {item.accent && (
                     <span className="ip-nav-accent-dot" />
