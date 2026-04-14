@@ -21,6 +21,12 @@ export default defineConfig({
   build: {
     outDir: path.resolve(import.meta.dirname, "dist"),
     emptyOutDir: true,
+    rollupOptions: {
+      input: {
+        main: path.resolve(import.meta.dirname, "index.html"),
+        app: path.resolve(import.meta.dirname, "app.html"),
+      },
+    },
   },
   server: {
     host: "0.0.0.0",
