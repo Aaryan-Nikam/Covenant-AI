@@ -3,17 +3,42 @@ import "./_shared/_shared.css";
 import "./Login.css";
 
 export function Login() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [apiKey, setApiKey] = useState(
+    sessionStorage.getItem("ironpass_api_key") || ""
+  );
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState("");
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!apiKey.trim()) {
+      setError("API key is required");
+      return;
+    }
     setIsLoading(true);
-    // Simulate login then redirect to dashboard
-    setTimeout(() => {
+    setError("");
+
+    // Validate the key hits the real backend before storing it
+    const base = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
+    try {
+      const res = await fetch(`${base}/dashboard/overview`, {
+        headers: { Authorization: `Bearer ${apiKey.trim()}` },
+      });
+
+      if (res.status === 401 || res.status === 403) {
+        setError("Invalid API key — check your Ironpass console.");
+        setIsLoading(false);
+        return;
+      }
+
+      // Key works — persist and redirect
+      sessionStorage.setItem("ironpass_api_key", apiKey.trim());
       window.location.hash = "dashboard";
-    }, 800);
+    } catch {
+      // Backend unreachable — accept the key so dev mode still works
+      sessionStorage.setItem("ironpass_api_key", apiKey.trim());
+      window.location.hash = "dashboard";
+    }
   };
 
   return (
@@ -28,33 +53,25 @@ export function Login() {
             <span className="ip-login-logo-text">Ironpass</span>
           </div>
           <div className="ip-login-title">Sign in to Console</div>
-          <div className="ip-login-subtitle">Continue to your workspace</div>
+          <div className="ip-login-subtitle">Enter your tenant API key to continue</div>
         </div>
 
         <form className="ip-login-form" onSubmit={handleLogin}>
           <div className="ip-form-group">
-            <label className="ip-form-label" htmlFor="email">Email address</label>
+            <label className="ip-form-label" htmlFor="apikey">API Key</label>
             <input
-              id="email"
-              type="email"
-              className="ip-input"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="name@company.com"
-              required
-            />
-          </div>
-          <div className="ip-form-group">
-            <label className="ip-form-label" htmlFor="password">Password</label>
-            <input
-              id="password"
+              id="apikey"
               type="password"
               className="ip-input"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
+              value={apiKey}
+              onChange={(e) => setApiKey(e.target.value)}
+              placeholder="dbnc_live_••••••••••••"
               required
+              autoFocus
             />
+            {error && (
+              <div style={{ marginTop: 8, fontSize: 12, color: "#EF4444" }}>{error}</div>
+            )}
           </div>
           <button type="submit" className="ip-login-btn" disabled={isLoading}>
             {isLoading ? "Authenticating..." : "Sign in"}
@@ -62,7 +79,7 @@ export function Login() {
         </form>
 
         <div className="ip-login-footer">
-          Don't have an account? <a href="#contact">Contact security team</a>
+          Don't have an API key? <a href="#api-keys">Generate one in the console</a>
         </div>
       </div>
     </div>

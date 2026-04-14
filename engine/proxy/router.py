@@ -362,7 +362,9 @@ async def google_generate_content_proxy(
 # ---------------------------------------------------------------------------
 
 @router.post("/proxy/scan", response_model=ScanResponse)
+@limiter.limit("200/minute")
 async def explicit_scan(
+    request: Request,
     request_body: ScanRequest,
     background_tasks: BackgroundTasks,
     tenant: Tenant = Depends(verify_api_key),

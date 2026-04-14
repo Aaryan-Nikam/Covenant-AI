@@ -24,12 +24,19 @@ from engine.exceptions import KeyManagementError
 logger = logging.getLogger("ironpass.vault.key_manager")
 
 
+import time
+from threading import Lock
+
 class KeyManager:
     """
     Fetches encryption keys from the configured backend.
     Never stores keys in the application DB.
-    Never caches keys longer than the current operation.
+    Never caches keys longer than the TTL (5 minutes by default).
     """
+
+    _cache: dict[str, tuple[bytes, str, float]] = {}  # key_version -> (key_bytes, key_version, timestamp)
+    _cache_lock = Lock()
+    CACHE_TTL_SECONDS = 300  # 5 minutes
 
     def __init__(self):
         self.settings = get_settings()
@@ -133,6 +140,14 @@ class KeyManager:
         vault_token = self.settings.hashicorp_vault_token
         key_version = version or self._current_version
 
+        # Check cache under lock
+        with KeyManager._cache_lock:
+            cached = KeyManager._cache.get(key_version)
+            if cached:
+                cached_bytes, cached_ver, timestamp = cached
+                if time.time() - timestamp < KeyManager.CACHE_TTL_SECONDS:
+                    return cached_bytes, cached_ver
+
         # Map version to field name: v1 → "key", v2 → "key_v2", etc.
         field_name = "key" if key_version == "v1" else f"key_{key_version}"
 
@@ -190,6 +205,10 @@ class KeyManager:
                 logger.debug(
                     f"HashiCorp Vault: fetched key version={key_version}"
                 )
+                
+                with KeyManager._cache_lock:
+                    KeyManager._cache[key_version] = (key_bytes, key_version, time.time())
+                
                 return key_bytes, key_version
 
         except httpx.ConnectError:
@@ -224,6 +243,15 @@ class KeyManager:
         from engine.exceptions import KeyManagementError
 
         key_version = version or self._current_version
+
+        # Check cache under lock
+        with KeyManager._cache_lock:
+            cached = KeyManager._cache.get(key_version)
+            if cached:
+                cached_bytes, cached_ver, timestamp = cached
+                if time.time() - timestamp < KeyManager.CACHE_TTL_SECONDS:
+                    return cached_bytes, cached_ver
+
         kms_key_id = self.settings.aws_kms_key_id
         region = getattr(self.settings, "aws_region", "us-east-1")
         
@@ -269,6 +297,11 @@ class KeyManager:
         # Run boto3 calls in an executor since they are synchronous HTTP requests
         loop = asyncio.get_running_loop()
         try:
-            return await loop.run_in_executor(None, _fetch_or_generate)
+            key_bytes, key_ver = await loop.run_in_executor(None, _fetch_or_generate)
+            
+            with KeyManager._cache_lock:
+                KeyManager._cache[key_ver] = (key_bytes, key_ver, time.time())
+                
+            return key_bytes, key_ver
         except Exception as e:
             raise KeyManagementError(f"AWS KMS error: {e}")
