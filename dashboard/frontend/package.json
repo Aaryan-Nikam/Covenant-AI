@@ -5,7 +5,7 @@
   "private": true,
   "scripts": {
     "dev": "vite dev",
-    "build": "vite build",
+    "build": "vite build && mv dist/index.html dist/app.html && cp marketing.html dist/index.html",
     "preview": "vite preview",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
