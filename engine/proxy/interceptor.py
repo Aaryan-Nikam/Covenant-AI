@@ -15,6 +15,7 @@ Critical Rule #7: Block is immediate — stops pipeline.
 Critical Rule #8: Pipeline must complete in <200ms for regex/mask.
 """
 
+import asyncio
 import hashlib
 import logging
 import time
@@ -50,11 +51,14 @@ class ProxyInterceptor:
         action_executor: ActionExecutor,
         ruleset_registry: RulesetRegistry,
         db_session: AsyncSession,
+        http_client: httpx.AsyncClient | None = None,
     ):
         self.detection_engine = detection_engine
         self.action_executor = action_executor
         self.ruleset_registry = ruleset_registry
         self.audit_logger = AuditLogger(db_session)
+        # Use shared client if provided, otherwise fall back to per-request
+        self._http_client = http_client
 
     async def process_request(
         self,
@@ -155,10 +159,10 @@ class ProxyInterceptor:
                 audit_entry_id=audit_entry_id,
             )
 
-        # ---- STEP 4: LOG (always, regardless of outcome) ----
+        # ---- STEP 4: LOG (fire-and-forget — never blocks response) ----
         latency_ms = int((time.monotonic() - start_time) * 1000)
 
-        audit_entry_id = await self._log_audit(
+        asyncio.create_task(self._log_audit(
             agent_id=agent_id,
             request_content=content,
             rulesets_used=active_rulesets,
@@ -168,7 +172,8 @@ class ProxyInterceptor:
             target_url=target_url,
             latency_ms=latency_ms,
             outcome=outcome,
-        )
+        ))
+        audit_entry_id = None  # Not available immediately; logged asynchronously
 
         # Build response
         detection_summaries = [
@@ -216,36 +221,34 @@ class ProxyInterceptor:
     ) -> tuple[int, str]:
         """
         Forward (sanitized) content to the target LLM API.
+        Uses the process-level shared httpx client (warm TCP/TLS pool).
         Returns (status_code, response_body).
         """
-        try:
-            async with httpx.AsyncClient(timeout=30.0) as client:
-                if method.upper() == "POST":
-                    response = await client.post(
-                        target_url,
-                        content=content,
-                        headers={
-                            "Content-Type": "application/json",
-                            **headers,
-                        },
-                    )
-                elif method.upper() == "GET":
-                    response = await client.get(
-                        target_url,
-                        headers=headers,
-                    )
-                else:
-                    response = await client.request(
-                        method.upper(),
-                        target_url,
-                        content=content,
-                        headers={
-                            "Content-Type": "application/json",
-                            **headers,
-                        },
-                    )
+        # Use shared client if available, otherwise create a temporary one
+        if self._http_client and not self._http_client.is_closed:
+            client = self._http_client
+            should_close = False
+        else:
+            client = httpx.AsyncClient(timeout=30.0)
+            should_close = True
 
-                return response.status_code, response.text
+        try:
+            if method.upper() == "POST":
+                response = await client.post(
+                    target_url,
+                    content=content,
+                    headers={"Content-Type": "application/json", **headers},
+                )
+            elif method.upper() == "GET":
+                response = await client.get(target_url, headers=headers)
+            else:
+                response = await client.request(
+                    method.upper(),
+                    target_url,
+                    content=content,
+                    headers={"Content-Type": "application/json", **headers},
+                )
+            return response.status_code, response.text
 
         except httpx.TimeoutException:
             logger.error(f"Target timeout: {target_url}")
@@ -256,7 +259,9 @@ class ProxyInterceptor:
         except Exception as e:
             logger.error(f"Forward error: {e}")
             return 500, f'{{"error": "Proxy forward error: {str(e)}"}}'
-
+        finally:
+            if should_close:
+                await client.aclose()
     async def _log_audit(
         self,
         agent_id: str,

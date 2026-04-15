@@ -8,8 +8,12 @@ Proxy router mounted at /proxy with /scan, /rulesets endpoints.
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.util import get_remote_address
 
 from engine.config import get_settings
 from engine.database.connection import init_db, close_db
@@ -18,6 +22,28 @@ from engine.database.connection import init_db, close_db
 # Logging
 # ---------------------------------------------------------------------------
 settings = get_settings()
+
+# ---------------------------------------------------------------------------
+# Rate Limiter
+# ---------------------------------------------------------------------------
+# Redis-backed so limits persist across Railway restarts/deployments.
+# Falls back to in-memory if Redis is unreachable at startup.
+# Key: real client IP (Railway X-Forwarded-For respected).
+_redis_url = settings.redis_url or "memory://"
+try:
+    limiter = Limiter(
+        key_func=get_remote_address,
+        default_limits=["100/minute"],
+        storage_uri=_redis_url,
+        headers_enabled=True,
+    )
+except Exception:
+    logger.warning("Redis unavailable — rate limiter falling back to in-memory")
+    limiter = Limiter(
+        key_func=get_remote_address,
+        default_limits=["100/minute"],
+        headers_enabled=True,
+    )
 
 logging.basicConfig(
     level=getattr(logging, settings.log_level.upper(), logging.INFO),
@@ -55,6 +81,14 @@ async def lifespan(app: FastAPI):
         logger.warning(f"Database not available at startup: {e}")
         logger.warning("Health check will work, but proxy features require the database")
 
+    # Pre-warm the shared HTTP client so the first request doesn't pay init cost
+    try:
+        from engine.dependencies import get_http_client
+        get_http_client()
+        logger.info("Shared HTTP client pool initialized (HTTP/2 enabled)")
+    except Exception as e:
+        logger.warning(f"HTTP client pre-warm failed: {e}")
+
     # Load rulesets from YAML at startup
     try:
         from engine.rulesets.loader import RulesetLoader
@@ -72,6 +106,14 @@ async def lifespan(app: FastAPI):
     await close_db()
     logger.info("Database connections closed")
 
+    # Drain the shared HTTP connection pool
+    try:
+        from engine.dependencies import close_http_client
+        await close_http_client()
+        logger.info("HTTP client pool drained")
+    except Exception as e:
+        logger.warning(f"HTTP client shutdown error: {e}")
+
 
 # ---------------------------------------------------------------------------
 # FastAPI App
@@ -87,6 +129,22 @@ app = FastAPI(
     version="0.1.0",
     lifespan=lifespan,
 )
+
+# Rate limiter state and 429 handler
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+# Prometheus metrics — /metrics endpoint
+# Instruments all endpoints automatically:
+#   ironpass_http_requests_total (by method, path, status)
+#   ironpass_http_request_duration_seconds (p50, p95, p99 histograms)
+#   ironpass_http_requests_in_progress
+from prometheus_fastapi_instrumentator import Instrumentator
+Instrumentator(
+    app_name="ironpass",
+    excluded_handlers=["/metrics", "/health"],  # Don’t instrument these
+    body_handlers=[],
+).instrument(app).expose(app, endpoint="/metrics", include_in_schema=False)
 
 # CORS — restrict in production
 app.add_middleware(
@@ -107,6 +165,14 @@ app.add_middleware(
 # Proxy router (includes /openai/* and /proxy/* endpoints)
 from engine.proxy.router import router as proxy_router
 app.include_router(proxy_router, tags=["proxy"])
+
+# Admin router (tenant provisioning — secured by IRONPASS_ADMIN_SECRET)
+from engine.admin.router import router as admin_router
+app.include_router(admin_router, tags=["admin"])
+
+# Logs router (tenant audit log query — secured by tenant API key)
+from engine.logs.router import router as logs_router
+app.include_router(logs_router, tags=["logs"])
 
 # Dashboard router
 try:

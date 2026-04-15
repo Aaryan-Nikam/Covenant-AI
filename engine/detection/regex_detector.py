@@ -4,14 +4,29 @@ Ironpass — Layer 1: Regex pattern matching detector.
 Fast, deterministic pattern detection. No ML.
 Every pattern defined in active rulesets is run against content.
 Only runs patterns specified by active rulesets — never all patterns always.
+
+Performance: All patterns are pre-compiled on first use and cached for the
+lifetime of the process. Zero recompilation overhead per request.
 """
 
 import logging
 import re
+from typing import Pattern
 
 from engine.detection.models import Detection, DetectorConfig
 
 logger = logging.getLogger("ironpass.detection.regex")
+
+# Module-level pattern cache — compiled once, reused forever.
+# Key: raw pattern string  Value: compiled re.Pattern
+_PATTERN_CACHE: dict[str, Pattern] = {}
+
+
+def _get_compiled(pattern: str) -> Pattern:
+    """Return a compiled pattern, compiling on first access."""
+    if pattern not in _PATTERN_CACHE:
+        _PATTERN_CACHE[pattern] = re.compile(pattern)
+    return _PATTERN_CACHE[pattern]
 
 
 class RegexDetector:
@@ -38,7 +53,7 @@ class RegexDetector:
                 continue
             for pattern in detector.patterns:
                 try:
-                    compiled = re.compile(pattern)
+                    compiled = _get_compiled(pattern)
                 except re.error as e:
                     logger.warning(
                         f"Invalid regex pattern in detector '{detector.id}': {e}"

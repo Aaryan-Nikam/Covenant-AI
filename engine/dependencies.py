@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from secrets import compare_digest
 from typing import AsyncGenerator
 
+import httpx
 from fastapi import Depends, HTTPException, Security
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -103,6 +104,35 @@ async def verify_dashboard_api_key(
 _ruleset_registry: RulesetRegistry | None = None
 _detection_engine: DetectionEngine | None = None
 
+# Shared HTTP client — one persistent TCP/TLS connection pool for the
+# entire process lifetime. Eliminates per-request handshake overhead.
+# Limits: 100 connections total, 20 per host (OpenAI + Anthropic + Google).
+_http_client: httpx.AsyncClient | None = None
+
+
+def get_http_client() -> httpx.AsyncClient:
+    """Returns the process-level shared HTTP client."""
+    global _http_client
+    if _http_client is None or _http_client.is_closed:
+        _http_client = httpx.AsyncClient(
+            timeout=httpx.Timeout(30.0, connect=5.0),
+            limits=httpx.Limits(
+                max_connections=100,
+                max_keepalive_connections=20,
+                keepalive_expiry=30,
+            ),
+            http2=True,  # OpenAI and Anthropic both support HTTP/2
+        )
+    return _http_client
+
+
+async def close_http_client() -> None:
+    """Called at app shutdown to cleanly drain the connection pool."""
+    global _http_client
+    if _http_client and not _http_client.is_closed:
+        await _http_client.aclose()
+        _http_client = None
+
 def get_registry() -> RulesetRegistry:
     global _ruleset_registry
     if _ruleset_registry is None:
@@ -123,7 +153,7 @@ def _get_detection_engine() -> DetectionEngine:
 
 
 def get_interceptor(db: AsyncSession = Depends(get_db)) -> ProxyInterceptor:
-    """Injected proxy interceptor with DB."""
+    """Injected proxy interceptor with DB and shared HTTP client."""
     registry = get_registry()
     detection_engine = _get_detection_engine()
 
@@ -141,6 +171,7 @@ def get_interceptor(db: AsyncSession = Depends(get_db)) -> ProxyInterceptor:
         action_executor=executor,
         ruleset_registry=registry,
         db_session=db,
+        http_client=get_http_client(),
     )
 
 
