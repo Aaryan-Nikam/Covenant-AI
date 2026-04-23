@@ -1,7 +1,7 @@
 """
 Ironpass — Layer 3: spaCy Named Entity Recognition detector.
 
-Context-aware detection using spaCy en_core_web_lg model.
+Context-aware detection using spaCy en_core_web_sm model.
 Detects: PERSON, ORG, GPE, DATE entities.
 
 Critical Rule #5: Load model ONCE at class instantiation.
@@ -25,7 +25,7 @@ class NERDetector:
     Uses spaCy en_core_web_lg model — loaded ONCE at init.
     """
 
-    def __init__(self, model_name: str = "en_core_web_lg"):
+    def __init__(self, model_name: str = "en_core_web_sm"):
         """
         Load spaCy model at initialization.
         Critical Rule #5: This only happens once. The NERDetector instance
@@ -70,6 +70,7 @@ class NERDetector:
             return []
 
         detections: list[Detection] = []
+        doc = None
 
         for detector in detectors:
             if detector.layer != 3:
@@ -85,8 +86,9 @@ class NERDetector:
                     )
                     continue
 
-            # Run spaCy NER
-            doc = self.nlp(content)
+            # Run spaCy NER — parse doc only once per scan
+            if doc is None:
+                doc = self.nlp(content)
 
             for ent in doc.ents:
                 # Only process entities matching the detector's entity_class
