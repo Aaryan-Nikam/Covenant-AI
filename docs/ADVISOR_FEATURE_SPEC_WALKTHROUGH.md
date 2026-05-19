@@ -1,150 +1,432 @@
-# Ironpass External Advisor Feature Spec Walkthrough
+# Ironpass Technical Build Walkthrough (What Is Already Built)
 
-## 1) Purpose
-This document briefs an external advisor on how to evaluate and upgrade Ironpass as an enterprise-grade platform for:
-- AI governance and compliance enforcement
-- agent security controls
-- high-value operational function suites
+As-of date: 2026-05-20
+Audience: External technical advisor / architecture reviewer
+Purpose: Describe the implemented system, features, and module internals (not product prompts/journey)
 
-The advisor's mission is to examine product quality, engineering strategy, and system maturity, then deliver a prioritized upgrade plan that improves reliability, security posture, performance, and commercial readiness.
+## 1) System Overview
+Ironpass is a FastAPI-based multi-tenant compliance platform with two primary product surfaces:
+1. Core Compliance Layer (proxy interception, detection, action enforcement, vault, immutable audit)
+2. Function Suite (9 domain modules for high-value backend compliance/operations workflows)
 
-## 2) Product Scope (Current)
-Ironpass is structured in two surfaces:
-- **Core Compliance Layer**: policy enforcement, proxy interception, immutable audit logging, vault/token controls, tenant governance.
-- **Operations Function Suite**: business-critical compliance workflows with case escalation and dashboards.
+The app also includes:
+- Agent Security Suite (prompt injection, exfiltration, least-privilege tools, memory hygiene)
+- Admin provisioning APIs (tenant + key lifecycle)
+- Tenant audit query APIs
+- Dashboard backend APIs for operational visibility
 
-### Implemented Function Modules (9/9)
-1. Audit trails / AML & SAR workflow
-2. SLA breach + credit leakage monitoring
-3. Financial covenant and debt obligation monitoring
-4. GDPR retention + ROPA monitoring
-5. R&D tax credit activity tracking
-6. ESG data collection + CSRD compliance
-7. Supplier financial health + insolvency monitoring
-8. H&S near-miss + RIDDOR monitoring
-9. Competitor intelligence + strategic signal monitoring
+## 2) Runtime and Architecture
 
-## 3) Advisor Outcomes We Need
-The advisor should produce:
-- A **quality baseline** of our code, architecture, SDLC, and runtime controls.
-- A **risk register** (security, compliance, operational, scaling, and maintainability risks).
-- A **target-state architecture** and capability model for enterprise readiness.
-- A **90-day execution roadmap** with milestones, owners, and measurable acceptance criteria.
+### 2.1 Application Composition
+- Entry point: `engine/main.py`
+- Framework: FastAPI
+- DB access: SQLAlchemy async engine/sessionmaker
+- Startup lifecycle:
+  - initializes DB schemas/tables (`init_db`)
+  - pre-warms shared HTTP client pool
+  - loads rulesets from YAML
+- Middleware and platform controls:
+  - CORS middleware
+  - rate limiting (`slowapi`, default `100/minute`)
+  - Prometheus endpoint `/metrics`
 
-## 4) Evaluation Framework (What to Examine)
+### 2.2 Database Schemas and Tables
+The current model footprint is:
+- `public` schema:
+  - tenant/auth tables: `tenants`, `tenant_api_keys`
+  - function-suite tables: 25 compliance tables
+  - agent-security tables: 2 tables
+- `audit` schema:
+  - `audit_log` (append-only tamper-evident chain)
+- `vault` schema:
+  - `vault_tokens` (AES-GCM encrypted token map)
 
-### A. Build Quality and Engineering Method
-- Monorepo structure clarity, module boundaries, and ownership.
-- API contract quality (schema discipline, versioning, backward compatibility).
-- Test strategy depth (unit, integration, adversarial, load, regression).
-- CI/CD robustness (build determinism, secret handling, deployment gates).
-- Observability quality (logs, metrics, traces, SLO coverage).
+### 2.3 API Surface (Implemented Endpoint Count)
+- Proxy router: 8 endpoints
+- Compliance router: 44 endpoints
+- Agent Security router: 8 endpoints
+- Admin router: 6 endpoints
+- Logs router: 2 endpoints
+- Dashboard backend router: 6 endpoints
 
-### B. Security and Governance Readiness
-- Prompt injection defenses and trust-boundary handling.
-- Data exfiltration prevention in outputs, traces, and tool payloads.
-- Least-privilege enforcement at tool and data-domain levels.
-- Memory/session hygiene and sensitive-data scrubbing lifecycle.
-- Audit immutability integrity and evidence export readiness.
+## 3) Authentication, Tenant Isolation, and Access
 
-### C. Compliance and Domain Correctness
-- Regulatory logic correctness for each function module.
-- Case creation/escalation quality and deduplication behavior.
-- Policy-to-action traceability and explainability.
-- Tenant isolation and multi-tenant safety controls.
+### 3.1 Tenant API Authentication
+- Auth path: `verify_api_key` -> `authenticate_request`
+- Flow:
+  - requires Bearer key with `dbnc_live_` prefix
+  - hashes raw key (`SHA-256`) and looks up `tenant_api_keys.key_hash`
+  - checks revoked/inactive/expired states
+  - checks tenant active status
+  - returns tenant context used by all tenant-scoped endpoints
 
-### D. Operational and Commercial Maturity
-- Time-to-onboard for enterprise customers.
-- Module-level ROI instrumentation and value reporting.
-- Scalability bottlenecks across backend, DB, and async workflows.
-- Deployment reliability and incident response readiness.
+### 3.2 Admin Authentication
+- Admin endpoints protected by `IRONPASS_ADMIN_SECRET` bearer token
+- Admin API is separate from tenant keys
 
-## 5) Required Advisor Deliverables
-1. **Current-State Assessment Report**
-   - strengths, weaknesses, unknowns, and critical blockers
-2. **Risk & Gap Matrix**
-   - severity, likelihood, business impact, mitigation owner
-3. **Target Architecture Blueprint**
-   - control plane, policy plane, data plane, evidence plane
-4. **Execution Roadmap (30/60/90 days)**
-   - tasks, milestones, dependencies, acceptance gates
-5. **Quality Scorecard**
-   - baseline score and target score for each engineering pillar
+### 3.3 Isolation Guarantees in Code
+- Compliance and security evaluations are keyed by `tenant_id`
+- Audit queries scope by `agent_id` (mapped to tenant)
+- Vault retrieval enforces both `tenant_id` and `agent_id`
+- Tenant active rulesets are configurable per-tenant
 
-## 6) Minimum Audit Checklist
-The advisor must explicitly verify:
-- Reproducible builds in CI and local developer environments.
-- Secret management and deployment failure behavior.
-- Deterministic policy evaluation and case/event generation.
-- End-to-end traceability from input -> decision -> action -> audit evidence.
-- Failure-mode behavior (degraded mode, retries, fallbacks, incident signals).
-- Test quality against adversarial and edge-case inputs.
+## 4) Core Compliance Layer (Built Features)
 
-## 7) Scoring Model (Use in Report)
-Each domain is scored 1-5 with evidence:
-- 1 = fragile
-- 2 = partially working
-- 3 = production-capable with gaps
-- 4 = enterprise-ready
-- 5 = best-in-class
+### 4.1 Provider Proxy Interception
+Implemented provider proxy endpoints:
+- `POST /openai/v1/chat/completions`
+- `POST /anthropic/v1/messages`
+- `POST /google/v1/models/{model}:generateContent`
+- `POST /proxy/scan` (scan-only mode)
 
-Scored domains:
-- Architecture and modularity
-- Security controls
-- Compliance correctness
-- Testing and QA depth
-- CI/CD and release safety
-- Observability and incident readiness
-- Performance and scale
-- Documentation and onboarding
+Pipeline behavior:
+1. Extract structured provider payload content
+2. Run compliance pipeline (`process_request`)
+3. Apply detection/actions using active rulesets
+4. Forward sanitized content to upstream provider (proxy endpoints)
+5. De-tokenize provider response where session token map exists
+6. Log audit entry (async non-blocking)
 
-## 8) Upgrade Prioritization Rules
-Prioritize in this order:
-1. High-risk + high-business-impact controls
-2. Security/compliance issues that can break trust or contracts
-3. Reliability bottlenecks that threaten production SLAs
-4. Performance constraints blocking enterprise scale
-5. UX and workflow enhancements
+### 4.2 Detection Engine
+Detection layers (orchestrated by `DetectionEngine`):
+- Layer 1: regex detector
+- Layer 2: Luhn validation (credit card false-positive filtering)
+- Layer 3: NER detector (spaCy-based)
+- Deduplication strategy:
+  - by position
+  - ruleset priority + confidence + layer order
 
-## 9) Suggested 90-Day Upgrade Program
+### 4.3 Action Engine
+`ActionExecutor` applies actions in reverse position order to preserve text offsets.
+Supported actions:
+- `block`
+- `tokenize`
+- `mask`
+- `pseudonymize`
 
-### Phase 1 (Days 1-30): Baseline + Stabilize
-- Complete architecture and quality audit.
-- Close critical CI/CD and deployment reliability gaps.
-- Harden high-risk security boundaries and logging controls.
+Overlap resolution priority:
+- `block > tokenize > pseudonymize > mask`
 
-### Phase 2 (Days 31-60): Hardening + Standardization
-- Standardize policy evaluation contracts and case lifecycle semantics.
-- Expand adversarial + regression suites for all 9 modules.
-- Add SLO dashboards and runbooks for top operational paths.
+Fallback behavior:
+- if primary action fails, fallback action is attempted from ruleset config
 
-### Phase 3 (Days 61-90): Scale + Enterprise Packaging
-- Improve throughput and latency hotspots.
-- Finalize enterprise evidence/reporting templates.
-- Deliver customer-facing readiness package (controls, documentation, assurances).
+### 4.4 Rulesets (Current)
+Loaded YAML rulesets from `engine/rulesets/definitions`:
+- `pci_dss` (6 detectors)
+- `hipaa` (5 detectors)
+- `gdpr` (5 detectors)
+- `soc2` (3 detectors)
 
-## 10) Success Criteria (Advisor Engagement)
-Engagement is successful when we have:
-- A verified reduction in critical risks.
-- Green, repeatable CI/CD with explicit deployment gating.
-- Measurable quality score improvement across all core domains.
-- A signed-off target architecture and implementation backlog.
-- A clear go-to-market readiness narrative backed by technical evidence.
+Ruleset management endpoints:
+- `GET /proxy/rulesets`
+- `GET /proxy/rulesets/{ruleset_id}`
+- `PUT /proxy/rulesets/active` (per-tenant active rulesets)
 
-## 11) Access and Working Mode
-Advisor should receive:
-- Read access to repository and CI logs.
-- Controlled access to staging telemetry and non-production datasets.
-- Architecture walkthrough session with core builders.
-- Weekly checkpoint cadence with decision logs.
+### 4.5 Vault and Tokenization
+- Vault table: `vault.vault_tokens`
+- Encryption: AES-256-GCM
+- Keys are fetched via key manager, not stored in app DB
+- Tokens are tenant-scoped and agent-scoped
+- Supports invalidation and expiry cleanup workflows
 
-Expected cadence:
-- Week 1: discovery + baseline
-- Week 2: risk matrix + findings review
-- Week 3: target-state design
-- Week 4: prioritized upgrade plan and handoff
+### 4.6 Immutable Audit Layer
+- Audit table: `audit.audit_log`
+- Chain model:
+  - each entry has HMAC signature
+  - each entry stores previous entry hash link
+- Verification:
+  - dashboard endpoint verifies chain integrity
+- Tenant-facing audit query excludes internal signature/hash fields
 
-## 12) Immediate Next Actions
-- Assign an internal technical owner for the advisor engagement.
-- Approve this scope as the official evaluation brief.
-- Start with CI/CD reliability and security boundary audit first.
+## 5) Agent Security Suite (Built)
+Base route: `/v1/agent-security`
+
+Implemented endpoints:
+- `GET /overview`
+- `GET /policy`
+- `PUT /policy`
+- `POST /decision/evaluate`
+- `POST /prompt-injection/analyze`
+- `POST /context-exfiltration/analyze`
+- `POST /tool-permissions/evaluate`
+- `POST /memory/audit`
+
+### 5.1 Policy Model
+Per-tenant persisted policy includes:
+- mode: `monitor | enforce`
+- block/review thresholds
+- max tools per task
+- strict tool allowlist mode
+- memory retention controls
+- allowed destination domains
+
+### 5.2 Decision Engine
+Composite `decision/evaluate` runs four controls and returns signed decision payload.
+Controls:
+1. Prompt injection shield
+2. Context exfiltration guard
+3. Least-privilege tool gate
+4. Memory hygiene audit
+
+Overall risk score weighting:
+- prompt injection: 35%
+- exfiltration: 35%
+- tool permissions: 20%
+- memory audit: 10%
+
+Action resolution:
+- hard-block conditions can return `block` (or `review` in monitor mode)
+- otherwise review threshold check
+- else `allow`
+
+Idempotency behavior:
+- decision logs keyed by `tenant_id + request_id`
+- repeated `request_id` returns existing persisted decision
+
+## 6) Function Suite (9/9 Implemented)
+Base route: `/v1/compliance`
+
+### 6.1 Shared Cross-Module Patterns
+Across modules, implementation includes:
+- table-backed state and snapshots
+- per-module create/list/evaluate APIs
+- dashboard metrics API
+- case escalation to shared `compliance_cases`
+- immutable `compliance_case_events` timeline records
+- case dedupe/reuse for open in-review states where implemented
+
+### 6.2 Module 1: AML + SAR Workflow
+Key tables:
+- `aml_signals`, `compliance_cases`, `sar_reports`, `compliance_case_events`
+
+Endpoints:
+- `POST /aml/signals`
+- `GET /aml/cases`
+- `GET /aml/cases/{case_id}`
+- `POST /aml/cases/{case_id}/sar-draft`
+- `POST /aml/cases/{case_id}/submit`
+- `GET /aml/dashboard`
+
+Scoring logic highlights:
+- deterministic risk score with factors:
+  - amount bands (>=5k, >=10k)
+  - cash channel
+  - high-risk jurisdictions
+  - PEP hit
+  - sanctions hit
+  - unusual pattern
+  - new customer + high amount
+- score caps at 100
+- escalation to case when score >= 70 or sanction hit
+
+### 6.3 Module 2: Financial Covenant + Debt Monitoring
+Key tables:
+- `financial_covenants`, `financial_snapshots`, `covenant_evaluations`
+
+Endpoints:
+- `POST /covenants`
+- `GET /covenants`
+- `POST /covenants/evaluate`
+- `GET /covenants/dashboard`
+
+Evaluation logic:
+- comparator-based checks (`<=`, `>=`, `<`, `>`, `=`)
+- statuses: `compliant | at_risk | breached`
+- warning band based on threshold distance percentage
+- case creation for `at_risk` and `breached`
+
+### 6.4 Module 3: SLA Breach + Credit Leakage Monitoring
+Key tables:
+- `sla_contracts`, `sla_snapshots`, `sla_evaluations`
+
+Endpoints:
+- `POST /sla/contracts`
+- `GET /sla/contracts`
+- `POST /sla/evaluate`
+- `GET /sla/dashboard`
+
+Evaluation logic:
+- comparator checks against observed values
+- estimated credit leakage calculation for breaches:
+  - base rate + severity multiplier by distance bands
+  - capped by max credit percent
+- breach case creation + event timeline
+
+### 6.5 Module 4: GDPR Retention + ROPA Monitoring
+Key tables:
+- `gdpr_retention_policies`, `gdpr_retention_snapshots`, `gdpr_retention_findings`
+- `gdpr_processing_activities`
+
+Endpoints:
+- `POST /gdpr/retention-policies`
+- `GET /gdpr/retention-policies`
+- `POST /gdpr/retention/evaluate`
+- `GET /gdpr/retention/dashboard`
+- `POST /gdpr/ropa/activities`
+- `GET /gdpr/ropa/activities`
+- `POST /gdpr/ropa/monitor`
+- `GET /gdpr/ropa/dashboard`
+
+Evaluation logic:
+- retention statuses: `compliant | warning | breach | no_policy`
+- ROPA monitoring statuses: `compliant | warning | critical`
+- critical triggers include missing lawful basis/purpose/categories and overdue review
+
+### 6.6 Module 5: R&D Tax Credit Activity Tracking
+Key tables:
+- `rd_tax_activities`, `rd_tax_assessments`
+
+Endpoints:
+- `POST /rd-tax/activities`
+- `GET /rd-tax/activities`
+- `POST /rd-tax/evaluate`
+- `GET /rd-tax/dashboard`
+
+Evaluation logic:
+- groups activities by project within period window
+- qualifying cost requires:
+  - qualifying category match
+  - technical uncertainty true
+  - narrative present
+  - evidence references present
+- statuses: `eligible | at_risk | non_compliant`
+- estimated credit amount computed from qualifying cost and credit rate
+
+### 6.7 Module 6: ESG Data + CSRD Compliance
+Key tables:
+- `esg_metrics`, `esg_csrd_submissions`
+
+Endpoints:
+- `POST /esg/metrics`
+- `GET /esg/metrics`
+- `POST /esg/csrd/evaluate`
+- `GET /esg/csrd/dashboard`
+
+Evaluation logic:
+- checks required metric coverage, evidence presence, and staleness window
+- statuses: `compliant | stale | missing_required | not_required`
+- computes coverage percentage for required metrics
+
+### 6.8 Module 7: Supplier Financial Health + Insolvency Monitoring
+Key tables:
+- `supplier_profiles`, `supplier_risk_assessments`
+
+Endpoints:
+- `POST /supplier/profiles`
+- `GET /supplier/profiles`
+- `POST /supplier/financial-health/evaluate`
+- `GET /supplier/financial-health/dashboard`
+
+Risk logic:
+- weighted score inputs:
+  - probability of default
+  - payment delay days
+  - watchlist hit
+  - covenant breach signal
+- statuses: `stable | warning | critical`
+- case escalation for critical outcomes
+
+### 6.9 Module 8: H&S Near-Miss + RIDDOR Monitoring
+Key tables:
+- `hs_incidents`, `hs_riddor_assessments`
+
+Endpoints:
+- `POST /hs/incidents`
+- `GET /hs/incidents`
+- `POST /hs/riddor/monitor`
+- `GET /hs/riddor/dashboard`
+
+Evaluation logic:
+- reportability checks by incident type, severity, and lost-time days
+- deadline logic for reporting windows
+- statuses include:
+  - `not_reportable`, `pending_report`, `due_soon`, `overdue`, `reported_on_time`, `reported_late`
+
+### 6.10 Module 9: Competitor Intelligence + Strategic Signals
+Key tables:
+- `competitor_profiles`, `competitor_signal_assessments`
+
+Endpoints:
+- `POST /competitor/profiles`
+- `GET /competitor/profiles`
+- `POST /competitor/signals/evaluate`
+- `GET /competitor/signals/dashboard`
+
+Scoring logic:
+- priority score from:
+  - signal strength (50%)
+  - source confidence (20%)
+  - revenue impact (30%)
+  - plus boost for high-impact signal types
+- statuses: `tracking | warning | critical`
+- critical signals escalate to cases
+
+## 7) Control Plane and Reporting Surfaces
+
+### 7.1 Dashboard Backend
+Implemented dashboard APIs:
+- `GET /dashboard/overview`
+- `GET /dashboard/violations`
+- `GET /dashboard/audit`
+- `GET /dashboard/audit/verify`
+- `GET /dashboard/product-map`
+- `GET /dashboard/functions/overview`
+
+Current product-map catalog reports all 9 function modules as implemented.
+
+### 7.2 Admin and Tenant Lifecycle APIs
+Implemented admin endpoints:
+- `POST /v1/admin/tenants`
+- `GET /v1/admin/tenants`
+- `PATCH /v1/admin/tenants/{tenant_id}`
+- `POST /v1/admin/tenants/{tenant_id}/keys`
+- `POST /v1/admin/tenants/{tenant_id}/keys/{key_id}/revoke`
+- `DELETE /v1/admin/tenants/{tenant_id}`
+
+### 7.3 Tenant Audit Query APIs
+Implemented tenant audit query endpoints:
+- `GET /v1/logs`
+- `GET /v1/logs/{entry_id}`
+
+## 8) Current Validation Snapshot
+
+### 8.1 Unit Tests
+- `pytest -q tests/unit`: 84 passed, 1 warning
+- `pytest -q tests/unit/test_compliance_service.py`: 20 passed
+- `pytest -q tests/unit/test_agent_security_service.py`: 5 passed
+
+### 8.2 Full Suite Snapshot
+- `pytest -q`: 102 passed, 62 skipped, 3 failed
+- Current failing tests are integration tests in `tests/integration/test_pipeline.py` expecting unauthenticated access to `/proxy/rulesets*` endpoints; current implementation returns `403` without auth.
+
+## 9) What Is Built vs. What Is Not Built
+
+### Built (Concrete)
+- End-to-end request interception + compliance pipeline for OpenAI/Anthropic/Google
+- YAML-driven ruleset system with detection/action execution
+- Vault tokenization with encrypted storage and de-tokenization support
+- Immutable audit chain with verification endpoint
+- Tenant provisioning/key lifecycle APIs
+- Agent security policy + decisioning service with signed outcomes
+- Nine operational compliance function modules with persistence + dashboards + case workflows
+
+### Not Yet in Current Implementation (Technical Gaps)
+- Advisor-grade auto-generated architecture diagrams from code (manual documentation only)
+- Full green integration suite (3 integration tests currently mismatched with auth behavior)
+- Documented migration system for schema evolution (tables are created via startup model registration)
+- Unified single API that atomically combines core proxy compliance decision + agent security decision in one call path (currently separate surfaces)
+
+## 10) File Map for Advisor Review
+Start here for direct code inspection:
+- App wiring: `engine/main.py`
+- DB init: `engine/database/connection.py`
+- Auth: `engine/dependencies.py`, `engine/auth/service.py`, `engine/auth/models.py`
+- Proxy + policy enforcement: `engine/proxy/router.py`, `engine/proxy/interceptor.py`
+- Detection: `engine/detection/engine.py`
+- Action execution: `engine/actions/executor.py`
+- Rulesets: `engine/rulesets/definitions/*.yaml`
+- Vault: `engine/vault/models.py`, `engine/vault/vault.py`
+- Audit: `engine/audit/models.py`, `engine/audit/signer.py`
+- Compliance suite: `engine/compliance/models.py`, `engine/compliance/schemas.py`, `engine/compliance/service.py`, `engine/compliance/router.py`
+- Agent Security suite: `engine/agent_security/models.py`, `engine/agent_security/schemas.py`, `engine/agent_security/service.py`, `engine/agent_security/router.py`
+- Dashboard backend: `dashboard/backend/service.py`, `dashboard/backend/router.py`
