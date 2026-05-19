@@ -22,12 +22,15 @@ COPY engine/ ./engine/
 # No --reload flag
 
 # Run with Gunicorn + Uvicorn workers
-CMD ["gunicorn", "engine.main:app", \
-    "--workers", "4", \
-    "--worker-class", "uvicorn.workers.UvicornWorker", \
-    "--bind", "0.0.0.0:8000", \
-    "--timeout", "60", \
-    "--graceful-timeout", "30", \
-    "--access-logfile", "-", \
-    "--error-logfile", "-", \
-    "--log-level", "info"]
+# Run with Gunicorn + Uvicorn workers
+# Shell form (not exec form) so ${PORT:-8000} expands at runtime.
+# Railway injects $PORT. Local runs default to 8000.
+CMD gunicorn engine.main:app \
+    --workers 4 \
+    --worker-class uvicorn.workers.UvicornWorker \
+    --bind 0.0.0.0:${PORT:-8000} \
+    --timeout 60 \
+    --graceful-timeout 30 \
+    --access-logfile - \
+    --error-logfile - \
+    --log-level info

@@ -30,10 +30,11 @@ class Tokenizer:
         value: str,
         data_type: str,
         agent_id: str,
+        tenant_id: str,
     ) -> str:
         """
         1. Generate token: TOK_{TYPE}_{uuid4().hex[:8]}
-        2. Store in vault: vault.store(token, value)
+        2. Store in vault: vault.store(token, value, tenant_id)
         3. Return token string
         """
         # Map data_type to short type code for token
@@ -41,15 +42,16 @@ class Tokenizer:
         token_id = uuid.uuid4().hex[:8]
         token = f"TOK_{type_code}_{token_id}"
 
-        # Store encrypted value in vault
+        # Store encrypted value in vault, bound to this tenant
         await self.vault.store(
             token=token,
             plaintext=value,
             data_type=data_type,
             agent_id=agent_id,
+            tenant_id=tenant_id,
         )
 
-        logger.debug(f"Tokenized: {data_type} → {token}")
+        logger.debug(f"Tokenized: {data_type} → {token} (tenant={tenant_id})")
         return token
 
     def _get_type_code(self, data_type: str) -> str:

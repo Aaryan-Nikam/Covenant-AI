@@ -13,6 +13,7 @@ In the current repo, Ironpass provides:
 - policy actions such as tokenize, mask, block, and pseudonymize
 - YAML-defined rulesets for regulated data handling
 - audit logging and token vault foundations
+- compliance-ops workflows for obligations, AML/SAR, covenant monitoring, SLA credit leakage monitoring, and GDPR retention/ROPA monitoring
 - Python and Node SDKs for integration
 - a lightweight dashboard shell for visibility into health, violations, audit logs, and rulesets
 
@@ -72,6 +73,7 @@ Built-in ruleset definitions in the repo include:
 
 ```text
 engine/                FastAPI proxy, detection, actions, vault, audit, rulesets
+  compliance/          Compliance operations APIs (AML/SAR, obligations, covenants, SLA, GDPR retention, ROPA)
 dashboard/             Backend and frontend dashboard surfaces
 sdk/python/            Python SDK
 sdk/nodejs/            Node/TypeScript SDK
@@ -170,4 +172,3 @@ It is still clearly an active MVP, not a finished production platform. Some arch
 ## License
 
 Proprietary. All rights reserved.
-

@@ -19,6 +19,7 @@ import asyncio
 import hashlib
 import logging
 import time
+import uuid
 
 import httpx
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -30,7 +31,6 @@ from engine.detection.models import ActionTaken, Detection
 from engine.exceptions import ComplianceViolation
 from engine.proxy.request_model import (
     ActionSummary,
-    BlockedResponse,
     DetectionSummary,
     ProxyResponse,
 )
@@ -63,13 +63,15 @@ class ProxyInterceptor:
     async def process_request(
         self,
         content: str,
-        target_url: str,
+        target_url: str | None,
         agent_id: str,
         tenant_id: str,
         active_rulesets: list[str],
+        metadata: dict | None = None,
+        forward: bool = True,
         headers: dict[str, str] | None = None,
         method: str = "POST",
-    ) -> ProxyResponse | BlockedResponse:
+    ) -> ProxyResponse:
         """
         Full compliance pipeline:
         1. DETECT — Scan content for sensitive data
@@ -78,6 +80,8 @@ class ProxyInterceptor:
         4. LOG — Audit log (background)
         """
         start_time = time.monotonic()
+        request_hash = hashlib.sha256(content.encode("utf-8")).hexdigest()
+        session_id = str(uuid.uuid4())
         detections: list[Detection] = []
         actions_taken: list[ActionTaken] = []
         was_blocked = False
@@ -93,14 +97,15 @@ class ProxyInterceptor:
             )
 
             if not detections:
-                # No detections — forward as-is
-                logger.debug(f"No detections — forwarding to {target_url}")
-                target_status_code, target_response = await self._forward(
-                    content=content,
-                    target_url=target_url,
-                    headers=headers or {},
-                    method=method,
-                )
+                # No detections — forward as-is unless caller requested scan-only mode.
+                if forward and target_url:
+                    logger.debug(f"No detections — forwarding to {target_url}")
+                    target_status_code, target_response = await self._forward(
+                        content=content,
+                        target_url=target_url,
+                        headers=headers or {},
+                        method=method,
+                    )
                 outcome = "passed"
 
             else:
@@ -119,12 +124,13 @@ class ProxyInterceptor:
                 actions_taken = result.actions_taken
 
                 # ---- STEP 3: FORWARD (sanitized content) ----
-                target_status_code, target_response = await self._forward(
-                    content=result.modified_content,
-                    target_url=target_url,
-                    headers=headers or {},
-                    method=method,
-                )
+                if forward and target_url:
+                    target_status_code, target_response = await self._forward(
+                        content=result.modified_content,
+                        target_url=target_url,
+                        headers=headers or {},
+                        method=method,
+                    )
                 outcome = "sanitized"
 
         except ComplianceViolation as violation:
@@ -151,13 +157,9 @@ class ProxyInterceptor:
                 outcome=outcome,
             )
 
-            return BlockedResponse(
-                error=str(violation),
-                data_type=violation.data_type,
-                ruleset_id=violation.ruleset_id,
-                detector_id=violation.detector_id,
-                audit_entry_id=audit_entry_id,
-            )
+            # Bubble up to route layer after auditing so each endpoint can return
+            # the provider-specific HTTP response shape.
+            raise
 
         # ---- STEP 4: LOG (fire-and-forget — never blocks response) ----
         latency_ms = int((time.monotonic() - start_time) * 1000)
@@ -209,6 +211,10 @@ class ProxyInterceptor:
             audit_entry_id=audit_entry_id,
             latency_ms=latency_ms,
             sanitized_content=result.modified_content if 'result' in locals() else content,
+            request_hash=request_hash,
+            rulesets_used=active_rulesets,
+            was_blocked=False,
+            session_id=session_id,
             session_token_map=result.session_token_map if 'result' in locals() else {},
         )
 
@@ -270,7 +276,7 @@ class ProxyInterceptor:
         detections: list[Detection],
         actions_taken: list[ActionTaken],
         was_blocked: bool,
-        target_url: str,
+        target_url: str | None,
         latency_ms: int,
         outcome: str,
     ) -> str | None:

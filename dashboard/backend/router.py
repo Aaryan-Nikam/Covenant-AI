@@ -26,7 +26,7 @@ async def overview(
 ):
     """Get overview statistics for the dashboard."""
     service = DashboardService(db)
-    return await service.get_overview()
+    return await service.get_overview(tenant)
 
 
 @router.get("/violations", summary="Recent violations (blocked requests)")
@@ -38,7 +38,11 @@ async def violations(
 ):
     """Get recent blocked request entries."""
     service = DashboardService(db)
-    return await service.get_violations(limit=limit, offset=offset)
+    return await service.get_violations(
+        tenant=tenant,
+        limit=limit,
+        offset=offset,
+    )
 
 
 @router.get("/audit", summary="Audit log entries")
@@ -54,8 +58,12 @@ async def audit_log(
     """Get audit log entries with optional agent_id filter."""
     service = DashboardService(db)
     return await service.get_audit_log(
-        limit=limit, offset=offset, agent_id=agent_id,
-        outcome=outcome, ruleset=ruleset
+        tenant=tenant,
+        limit=limit,
+        offset=offset,
+        agent_id=agent_id,
+        outcome=outcome,
+        ruleset=ruleset,
     )
 
 
@@ -67,4 +75,31 @@ async def verify_audit(
 ):
     """Verify the integrity of the audit chain."""
     service = DashboardService(db)
-    return await service.verify_audit_integrity(limit=limit)
+    return await service.verify_audit_integrity(
+        tenant=tenant,
+        limit=limit,
+    )
+
+
+@router.get("/product-map", summary="Core layer + operations function map")
+async def product_map(
+    tenant: Tenant = Depends(verify_api_key),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Returns the platform split between:
+    - core compliance layer
+    - operations function suite
+    """
+    service = DashboardService(db)
+    return await service.get_product_map(tenant)
+
+
+@router.get("/functions/overview", summary="Operations function live overview")
+async def functions_overview(
+    tenant: Tenant = Depends(verify_api_key),
+    db: AsyncSession = Depends(get_db),
+):
+    """Returns live status/metrics for implemented operations functions."""
+    service = DashboardService(db)
+    return await service.get_functions_overview(tenant)

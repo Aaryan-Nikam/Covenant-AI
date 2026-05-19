@@ -81,21 +81,20 @@ class DetectionEngine:
 
             all_detections.extend(validated_hits)
 
-            # --- Layer 3: NER (only if Layer 1/2 had hits) ---
+            # --- Layer 3: NER ---
+            # Runs if ruleset has NER detectors AND content matches their context keywords
+            # Optimized inside ner_detector.py to only run spaCy when necessary
             ner_detectors = ruleset.get_ner_detectors()
-            if ner_detectors and len(validated_hits) > 0:
+            if ner_detectors:
                 ner_hits = self.ner_detector.scan(
                     normalized_content, ner_detectors, ruleset_id
                 )
-                logger.debug(
-                    f"[{ruleset_id}] Layer 3 (NER): {len(ner_hits)} hits"
-                )
-                all_detections.extend(ner_hits)
-            elif ner_detectors:
-                logger.debug(
-                    f"[{ruleset_id}] Layer 3 (NER): skipped — "
-                    f"no Layer 1/2 hits (performance optimization)"
-                )
+                if ner_hits:
+                    logger.debug(
+                        f"[{ruleset_id}] Layer 3 (NER): {len(ner_hits)} hits"
+                    )
+                    all_detections.extend(ner_hits)
+
 
         # --- Deduplicate overlapping detections ---
         deduplicated = self._deduplicate(all_detections)

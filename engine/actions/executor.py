@@ -71,6 +71,7 @@ class ActionExecutor:
         detections: list[Detection],
         ruleset_actions: dict[str, ActionConfig],
         agent_id: str,
+        tenant_id: str,
     ) -> ExecutionResult:
         """
         Apply actions to all detections in reverse position order.
@@ -110,6 +111,7 @@ class ActionExecutor:
                     action_type=action_type,
                     detection=detection,
                     agent_id=agent_id,
+                    tenant_id=tenant_id,
                     session_token_map=session_token_map,
                     action_config=action_config,
                 )
@@ -156,6 +158,7 @@ class ActionExecutor:
                         action_type=fallback_type,
                         detection=detection,
                         agent_id=agent_id,
+                        tenant_id=tenant_id,
                         session_token_map=session_token_map,
                         action_config=action_config,
                     )
@@ -198,6 +201,7 @@ class ActionExecutor:
         action_type: str,
         detection: Detection,
         agent_id: str,
+        tenant_id: str,
         session_token_map: dict[str, str],
         action_config: ActionConfig,
     ) -> str:
@@ -216,6 +220,7 @@ class ActionExecutor:
                 value=detection.value,
                 data_type=detection.data_type,
                 agent_id=agent_id,
+                tenant_id=tenant_id,
             )
             # Store mapping for de-tokenizing the response later
             session_token_map[token] = self._get_display_value(

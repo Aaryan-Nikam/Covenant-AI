@@ -40,11 +40,21 @@ class VaultToken(Base):
     __table_args__ = (
         Index("idx_vault_expires", "expires_at"),
         Index("idx_vault_agent", "agent_id"),
+        # Compound index — all token lookups are scoped to tenant_id.
+        # Cross-tenant token access is structurally impossible at the DB layer.
+        Index("idx_vault_tenant_token", "tenant_id", "token", unique=True),
         {"schema": "vault"},
     )
 
     # TOK_{TYPE}_{8_CHAR_HEX} — e.g., TOK_CARD_a4f2b891
-    token = Column(String(64), primary_key=True)
+    # token is unique WITHIN a tenant, not globally. Two tenants can have
+    # the same token string — they will never collide because all lookups
+    # are scoped by tenant_id.
+    token = Column(String(64), primary_key=True, nullable=False)
+
+    # Tenant that owns this token. All retrieval is scoped to this value.
+    # A token belonging to tenant_A cannot be retrieved under tenant_B.
+    tenant_id = Column(String(128), primary_key=True, nullable=False, index=True)
 
     # AES-256-GCM encrypted value (ciphertext + authentication tag)
     ciphertext = Column(LargeBinary, nullable=False)

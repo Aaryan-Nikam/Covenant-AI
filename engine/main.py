@@ -8,9 +8,8 @@ Proxy router mounted at /proxy with /scan, /rulesets endpoints.
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
@@ -22,6 +21,12 @@ from engine.database.connection import init_db, close_db
 # Logging
 # ---------------------------------------------------------------------------
 settings = get_settings()
+logging.basicConfig(
+    level=getattr(logging, settings.log_level.upper(), logging.INFO),
+    format="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
+logger = logging.getLogger("ironpass")
 
 # ---------------------------------------------------------------------------
 # Rate Limiter
@@ -44,13 +49,6 @@ except Exception:
         default_limits=["100/minute"],
         headers_enabled=True,
     )
-
-logging.basicConfig(
-    level=getattr(logging, settings.log_level.upper(), logging.INFO),
-    format="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S",
-)
-logger = logging.getLogger("ironpass")
 
 
 # ---------------------------------------------------------------------------
@@ -139,11 +137,9 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 #   ironpass_http_requests_total (by method, path, status)
 #   ironpass_http_request_duration_seconds (p50, p95, p99 histograms)
 #   ironpass_http_requests_in_progress
-from prometheus_fastapi_instrumentator import Instrumentator
+from prometheus_fastapi_instrumentator import Instrumentator  # noqa: E402
 Instrumentator(
-    app_name="ironpass",
     excluded_handlers=["/metrics", "/health"],  # Don’t instrument these
-    body_handlers=[],
 ).instrument(app).expose(app, endpoint="/metrics", include_in_schema=False)
 
 # CORS — restrict in production
@@ -163,16 +159,24 @@ app.add_middleware(
 # ---------------------------------------------------------------------------
 
 # Proxy router (includes /openai/* and /proxy/* endpoints)
-from engine.proxy.router import router as proxy_router
+from engine.proxy.router import router as proxy_router  # noqa: E402
 app.include_router(proxy_router, tags=["proxy"])
 
 # Admin router (tenant provisioning — secured by IRONPASS_ADMIN_SECRET)
-from engine.admin.router import router as admin_router
+from engine.admin.router import router as admin_router  # noqa: E402
 app.include_router(admin_router, tags=["admin"])
 
 # Logs router (tenant audit log query — secured by tenant API key)
-from engine.logs.router import router as logs_router
+from engine.logs.router import router as logs_router  # noqa: E402
 app.include_router(logs_router, tags=["logs"])
+
+# Compliance operations router (AML/SAR + obligations workflows)
+from engine.compliance.router import router as compliance_router  # noqa: E402
+app.include_router(compliance_router, tags=["compliance"])
+
+# Agent Security Suite router
+from engine.agent_security.router import router as agent_security_router  # noqa: E402
+app.include_router(agent_security_router, tags=["agent-security"])
 
 # Dashboard router
 try:

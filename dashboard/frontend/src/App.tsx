@@ -13,6 +13,9 @@ import { ApiKeys } from "./components/mockups/ironpass/ApiKeys";
 import { Team } from "./components/mockups/ironpass/Team";
 import { Settings } from "./components/mockups/ironpass/Settings";
 import { Login } from "./components/mockups/ironpass/Login";
+import { ComplianceLayer } from "./components/mockups/ironpass/ComplianceLayer";
+import { OperationsFunctions } from "./components/mockups/ironpass/OperationsFunctions";
+import { AgentSecuritySuite } from "./components/mockups/ironpass/AgentSecuritySuite";
 
 function App() {
   const [route, setRoute] = useState(() => window.location.hash.slice(1) || "login");
@@ -25,6 +28,9 @@ function App() {
 
   switch (route) {
     case "login": return <Login />;
+    case "compliance-layer": return <ComplianceLayer />;
+    case "operations-functions": return <OperationsFunctions />;
+    case "agent-security-suite": return <AgentSecuritySuite />;
     case "dashboard": return <Dashboard />;
     case "audit": return <AuditLog />;
     case "violations": return <Violations />;

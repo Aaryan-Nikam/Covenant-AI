@@ -42,15 +42,6 @@ detectors:
     data_type: person_name
     layer: 3
     entity_class: PERSON
-    context_required:
-      keywords:
-        - customer
-        - user
-        - subscriber
-        - resident
-        - citizen
-        - data subject
-        - personal data
     confidence_threshold: 0.8
 
 actions:

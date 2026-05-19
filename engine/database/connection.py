@@ -73,9 +73,16 @@ async def init_db() -> None:
     # Import all models so they register with Base.metadata
     import engine.vault.models  # noqa: F401
     import engine.audit.models  # noqa: F401
+    import engine.auth.models   # noqa: F401  — Tenant, TenantAPIKey
+    import engine.compliance.models  # noqa: F401
+    import engine.agent_security.models  # noqa: F401
 
+    from sqlalchemy import text
     engine = get_engine()
     async with engine.begin() as conn:
+        # Create non-public schemas first (Railway Postgres only has 'public' by default)
+        await conn.execute(text("CREATE SCHEMA IF NOT EXISTS audit"))
+        await conn.execute(text("CREATE SCHEMA IF NOT EXISTS vault"))
         await conn.run_sync(Base.metadata.create_all)
 
 

@@ -1,0 +1,60 @@
+# Ironpass — Railway Environment Variables
+# ==========================================
+# Set these in: Railway Dashboard → Project → Service → Variables
+#
+# Variables Railway provides AUTOMATICALLY (do NOT set these manually):
+#   DATABASE_URL   — from the PostgreSQL plugin
+#   REDIS_URL      — from the Redis plugin
+#   PORT           — injected by Railway at runtime
+#
+# Variables YOU must set:
+# -----------------------------------------------------------------------
+
+# --- Required: Security ---
+# Generate with: python -c "import secrets; print(secrets.token_hex(32))"
+AUDIT_HMAC_KEY=<64-hex-chars>
+PSEUDONYM_SECRET_KEY=<64-hex-chars>
+
+# --- Required: Key Backend ---
+# Use 'aws_kms' for production. 'local' for a first smoke-test deploy only.
+KEY_BACKEND=aws_kms
+
+# If KEY_BACKEND=aws_kms:
+AWS_KMS_KEY_ID=arn:aws:kms:us-east-1:ACCOUNT:key/KEY-ID
+AWS_REGION=us-east-1
+
+# If KEY_BACKEND=local (dev/smoke-test only — NEVER for real customer data):
+# LOCAL_VAULT_KEY=<64-hex-chars>
+
+# If KEY_BACKEND=hashicorp:
+# HASHICORP_VAULT_URL=https://vault.yourcompany.com
+# HASHICORP_VAULT_TOKEN=hvs.xxxx
+
+# --- Application ---
+APP_ENV=production
+LOG_LEVEL=INFO
+VAULT_TOKEN_TTL_HOURS=24
+
+# --- spaCy ---
+# en_core_web_lg is downloaded in the Dockerfile build step.
+# Only change this if you switch models.
+SPACY_MODEL=en_core_web_lg
+
+# -----------------------------------------------------------------------
+# Railway setup steps:
+#
+# 1. Create a new Railway project
+# 2. Add a PostgreSQL plugin  → Railway auto-sets DATABASE_URL
+# 3. Add a Redis plugin       → Railway auto-sets REDIS_URL
+# 4. Connect this GitHub repo → Railway auto-detects Dockerfile.prod
+# 5. Set the variables above in the Variables tab
+# 6. Deploy
+#
+# First deploy will:
+#   - Build the Docker image (~5 min — spaCy model download)
+#   - Start the container
+#   - init_db() runs at startup → creates all DB tables automatically
+#   - Health check hits /health → Railway marks service as healthy
+#
+# Your live URL: https://<project>.railway.app
+# Wire api.ironpass.io → this URL in Cloudflare DNS (CNAME, proxied)

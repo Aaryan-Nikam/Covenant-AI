@@ -33,11 +33,11 @@ export function Login() {
 
       // Key works — persist and redirect
       sessionStorage.setItem("ironpass_api_key", apiKey.trim());
-      window.location.hash = "dashboard";
+      window.location.hash = "compliance-layer";
     } catch {
       // Backend unreachable — accept the key so dev mode still works
       sessionStorage.setItem("ironpass_api_key", apiKey.trim());
-      window.location.hash = "dashboard";
+      window.location.hash = "compliance-layer";
     }
   };
 

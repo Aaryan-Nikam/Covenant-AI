@@ -49,6 +49,12 @@ class NERDetector:
                 f"Install with: python -m spacy download {model_name}"
             )
             self.nlp = None
+        except Exception as exc:
+            logger.warning(
+                "spaCy initialization failed (%s). NER detection disabled.",
+                exc,
+            )
+            self.nlp = None
 
     def scan(
         self,

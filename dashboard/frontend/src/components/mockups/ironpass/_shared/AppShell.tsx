@@ -1,7 +1,10 @@
-import React, { useState } from "react";
+import React from "react";
 import "./_shared.css";
 
 type NavPage =
+  | "compliance-layer"
+  | "operations-functions"
+  | "agent-security-suite"
   | "dashboard"
   | "audit"
   | "violations"
@@ -23,6 +26,14 @@ interface AppShellProps {
 }
 
 const navGroups = [
+  {
+    label: "Product",
+    items: [
+      { id: "compliance-layer" as NavPage, label: "Core Layer" },
+      { id: "operations-functions" as NavPage, label: "Function Suite" },
+      { id: "agent-security-suite" as NavPage, label: "Agent Security" },
+    ],
+  },
   {
     label: "Monitor",
     items: [
@@ -60,7 +71,7 @@ const navGroups = [
 
 export function AppShell({ children }: AppShellProps) {
   // Override activePage and onNavigate to use hash routing globally for the mockups
-  const activePage = window.location.hash.slice(1) || "dashboard";
+  const activePage = window.location.hash.slice(1) || "compliance-layer";
   const handleNavigate = (page: NavPage) => {
     window.location.hash = page;
   };

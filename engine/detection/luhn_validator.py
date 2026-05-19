@@ -63,7 +63,6 @@ class LuhnValidator:
         filtered: list[Detection] = []
 
         for detection in detections:
-            print(f"LUHN CHECKING: '{detection.value}' for {detection.data_type}")
             # Only validate credit_card data types
             if detection.data_type != "credit_card":
                 filtered.append(detection)

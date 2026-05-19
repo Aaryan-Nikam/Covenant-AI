@@ -18,13 +18,24 @@ Both sets go through the same compliance pipeline.
 Authentication is the same for both.
 """
 
-from fastapi import APIRouter, Request, Header, HTTPException, BackgroundTasks, Depends
+import logging
+import uuid
 from typing import Annotated
+
+from fastapi import APIRouter, Depends, Header, HTTPException, Request
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
-from engine.dependencies import verify_api_key, get_interceptor, get_forwarder, Tenant, get_registry
+from engine.dependencies import (
+    verify_api_key,
+    get_interceptor,
+    get_forwarder,
+    Tenant,
+    get_registry,
+    get_db,
+)
 from engine.rulesets.registry import RulesetRegistry
 from engine.exceptions import RulesetNotFoundError
 from engine.proxy.extractors.openai import OpenAIContentExtractor
@@ -33,7 +44,9 @@ from engine.proxy.extractors.google import GoogleContentExtractor
 from engine.proxy.forwarder import OpenAIForwarder
 from engine.proxy.interceptor import ProxyInterceptor
 from engine.proxy.request_model import (
-    OpenAIProxyRequest,
+    ActiveRulesetsUpdateRequest,
+    ActiveRulesetsUpdateResponse,
+    Violation,
     ScanRequest,
     ScanResponse,
     ComplianceViolationError,
@@ -42,11 +55,20 @@ from engine.exceptions import ComplianceViolation
 
 router = APIRouter()
 limiter = Limiter(key_func=get_remote_address)
+logger = logging.getLogger("ironpass.proxy.router")
 
 # Provider-specific extractors — instantiated once, stateless
 _openai_extractor = OpenAIContentExtractor()
 _anthropic_extractor = AnthropicContentExtractor()
 _google_extractor = GoogleContentExtractor()
+
+
+def _violation_payload(exc: ComplianceViolation) -> list[dict[str, str]]:
+    return [{
+        "type": exc.data_type,
+        "action": "block",
+        "ruleset": exc.ruleset_id,
+    }]
 
 
 # ---------------------------------------------------------------------------
@@ -57,7 +79,6 @@ _google_extractor = GoogleContentExtractor()
 @limiter.limit("200/minute")  # Runaway agent protection — 429 if exceeded
 async def openai_chat_completions_proxy(
     request: Request,
-    background_tasks: BackgroundTasks,
     authorization: Annotated[str, Header()],
     x_openai_key: Annotated[str, Header(alias="X-OpenAI-Key")],
     tenant: Tenant = Depends(verify_api_key),
@@ -114,21 +135,13 @@ async def openai_chat_completions_proxy(
         )
 
     except ComplianceViolation as e:
-        # Hard block — do not forward to OpenAI
-        # Log the block as background task
-        background_tasks.add_task(
-            interceptor.audit_logger.write_block,
-            agent_id=tenant.agent_id,
-            reason=str(e),
-            rulesets_used=tenant.active_rulesets,
-        )
         raise HTTPException(400, {
             "error": {
                 "type": "compliance_violation",
                 "code": "CONTENT_BLOCKED",
                 "message": "Request blocked by active compliance policy",
-                "violations": [v.dict() for v in e.violations],
-                "ironpass_request_id": e.request_id,
+                "violations": _violation_payload(e),
+                "ironpass_request_id": str(uuid.uuid4()),
             }
         })
 
@@ -144,20 +157,6 @@ async def openai_chat_completions_proxy(
         path="/v1/chat/completions",
         payload=sanitized_body,
         openai_api_key=x_openai_key,
-    )
-
-    # Write audit log as background task — never blocks response
-    background_tasks.add_task(
-        interceptor.audit_logger.write,
-        agent_id=tenant.agent_id,
-        request_hash=result.request_hash,
-        rulesets_used=tenant.active_rulesets,
-        detections=result.detections,
-        actions_taken=result.actions_taken,
-        was_blocked=False,
-        target_url="https://api.openai.com/v1/chat/completions",
-        latency_ms=forward_result.latency_ms,
-        outcome="passed",
     )
 
     # Handle upstream errors
@@ -201,7 +200,6 @@ async def openai_chat_completions_proxy(
 @limiter.limit("200/minute")
 async def anthropic_messages_proxy(
     request: Request,
-    background_tasks: BackgroundTasks,
     authorization: Annotated[str, Header()],
     x_anthropic_key: Annotated[str, Header(alias="X-Anthropic-Key")],
     tenant: Tenant = Depends(verify_api_key),
@@ -237,7 +235,7 @@ async def anthropic_messages_proxy(
                 "type": "compliance_violation",
                 "code": "CONTENT_BLOCKED",
                 "message": "Request blocked by active compliance policy",
-                "violations": [v.dict() for v in e.violations],
+                "violations": _violation_payload(e),
             }
         })
 
@@ -260,19 +258,6 @@ async def anthropic_messages_proxy(
             },
         )
 
-    background_tasks.add_task(
-        interceptor.audit_logger.write,
-        agent_id=tenant.agent_id,
-        request_hash=result.request_hash,
-        rulesets_used=tenant.active_rulesets,
-        detections=result.detections,
-        actions_taken=result.actions_taken,
-        was_blocked=False,
-        target_url="https://api.anthropic.com/v1/messages",
-        latency_ms=0,
-        outcome="passed",
-    )
-
     return resp.json()
 
 
@@ -285,7 +270,6 @@ async def anthropic_messages_proxy(
 async def google_generate_content_proxy(
     model: str,
     request: Request,
-    background_tasks: BackgroundTasks,
     authorization: Annotated[str, Header()],
     x_google_key: Annotated[str, Header(alias="X-Google-Key")],
     tenant: Tenant = Depends(verify_api_key),
@@ -321,6 +305,7 @@ async def google_generate_content_proxy(
                 "type": "compliance_violation",
                 "code": "CONTENT_BLOCKED",
                 "message": "Request blocked by active compliance policy",
+                "violations": _violation_payload(e),
             }
         })
 
@@ -341,19 +326,6 @@ async def google_generate_content_proxy(
             headers={"content-type": "application/json"},
         )
 
-    background_tasks.add_task(
-        interceptor.audit_logger.write,
-        agent_id=tenant.agent_id,
-        request_hash=result.request_hash,
-        rulesets_used=tenant.active_rulesets,
-        detections=result.detections,
-        actions_taken=result.actions_taken,
-        was_blocked=False,
-        target_url=target,
-        latency_ms=0,
-        outcome="passed",
-    )
-
     return resp.json()
 
 
@@ -366,7 +338,6 @@ async def google_generate_content_proxy(
 async def explicit_scan(
     request: Request,
     request_body: ScanRequest,
-    background_tasks: BackgroundTasks,
     tenant: Tenant = Depends(verify_api_key),
     interceptor: ProxyInterceptor = Depends(get_interceptor),
 ):
@@ -383,31 +354,25 @@ async def explicit_scan(
             target_url=str(request_body.target_url) if request_body.target_url else None,
             metadata=request_body.metadata,
             active_rulesets=request_body.rulesets or tenant.active_rulesets,
+            forward=False,
         )
     except ComplianceViolation as e:
+        violations = [Violation(**v) for v in _violation_payload(e)]
         raise HTTPException(400, ComplianceViolationError(
-            violations=e.violations,
-            request_id=e.request_id,
+            violations=violations,
+            request_id=str(uuid.uuid4()),
         ).dict())
 
-    background_tasks.add_task(
-        interceptor.audit_logger.write,
-        agent_id=tenant.agent_id,
-        request_hash=result.request_hash,
-        rulesets_used=result.rulesets_used,
-        detections=result.detections,
-        actions_taken=result.actions_taken,
-        was_blocked=result.was_blocked,
-        target_url=str(request_body.target_url) if request_body.target_url else None,
-        latency_ms=result.latency_ms,
-        outcome="blocked" if result.was_blocked else "passed",
-    )
+    violations = [
+        Violation(type=a.data_type, action=a.action, ruleset=a.ruleset_id)
+        for a in result.actions_taken
+    ]
 
     return ScanResponse(
         sanitized_content=result.sanitized_content,
-        violations=result.violations,
+        violations=violations,
         was_blocked=result.was_blocked,
-        audit_id=result.audit_id,
+        audit_id=result.audit_entry_id or "",
         session_id=result.session_id,
         latency_ms=result.latency_ms,
     )
@@ -452,14 +417,52 @@ async def get_ruleset(
         raise HTTPException(status_code=404, detail="Ruleset not found")
 
 
+@router.put("/proxy/rulesets/active", response_model=ActiveRulesetsUpdateResponse)
+async def update_active_rulesets(
+    body: ActiveRulesetsUpdateRequest,
+    tenant: Tenant = Depends(verify_api_key),
+    db: AsyncSession = Depends(get_db),
+    registry: RulesetRegistry = Depends(get_registry),
+):
+    """
+    Replace the active ruleset list for this tenant.
+    Used by the compliance-layer UI to operationally manage controls.
+    """
+    requested = sorted({ruleset.strip() for ruleset in body.rulesets if ruleset.strip()})
+    available = set(registry.list_ids())
+    invalid = sorted([ruleset for ruleset in requested if ruleset not in available])
+
+    if invalid:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "message": "Unknown ruleset IDs provided",
+                "invalid_rulesets": invalid,
+                "available_rulesets": sorted(available),
+            },
+        )
+
+    tenant.active_rulesets = requested
+    await db.flush()
+
+    logger.info(
+        "Updated tenant active rulesets tenant=%s rulesets=%s",
+        tenant.id,
+        requested,
+    )
+
+    return ActiveRulesetsUpdateResponse(
+        active_rulesets=requested,
+        invalid_rulesets=[],
+    )
+
+
 # ---------------------------------------------------------------------------
 # HEALTH CHECK — No auth required
 # ---------------------------------------------------------------------------
 
 @router.get("/health")
-async def health_check(
-    interceptor: ProxyInterceptor = Depends(get_interceptor),
-):
+async def health_check():
     """
     Load balancer hits this every 30 seconds.
     Returns 200 if system is healthy.

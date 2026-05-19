@@ -5,7 +5,7 @@ All shared dependencies are defined here and injected via FastAPI's
 Depends() mechanism. Components never instantiate their own dependencies.
 """
 
-from dataclasses import dataclass
+import logging
 from secrets import compare_digest
 from typing import AsyncGenerator
 
@@ -14,12 +14,16 @@ from fastapi import Depends, HTTPException, Security
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from engine.auth.models import Tenant
+from engine.auth.service import authenticate_request
 from engine.config import Settings, get_settings
 from engine.database.connection import get_session_factory
 from engine.detection.engine import DetectionEngine
 from engine.proxy.forwarder import OpenAIForwarder
 from engine.proxy.interceptor import ProxyInterceptor
 from engine.rulesets.registry import RulesetRegistry
+
+logger = logging.getLogger("ironpass.dependencies")
 
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
@@ -40,13 +44,6 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
 def get_config() -> Settings:
     """Returns the cached settings singleton."""
     return get_settings()
-
-
-from fastapi import Security
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-
-from engine.auth.models import Tenant
-from engine.auth.service import authenticate_request
 
 security = HTTPBearer()
 
@@ -114,15 +111,28 @@ def get_http_client() -> httpx.AsyncClient:
     """Returns the process-level shared HTTP client."""
     global _http_client
     if _http_client is None or _http_client.is_closed:
-        _http_client = httpx.AsyncClient(
-            timeout=httpx.Timeout(30.0, connect=5.0),
-            limits=httpx.Limits(
+        client_kwargs = {
+            "timeout": httpx.Timeout(30.0, connect=5.0),
+            "limits": httpx.Limits(
                 max_connections=100,
                 max_keepalive_connections=20,
                 keepalive_expiry=30,
             ),
-            http2=True,  # OpenAI and Anthropic both support HTTP/2
-        )
+        }
+        try:
+            _http_client = httpx.AsyncClient(
+                **client_kwargs,
+                http2=True,  # Preferred when h2 dependency is available
+            )
+        except ImportError:
+            logger.warning(
+                "httpx HTTP/2 support unavailable (h2 missing). "
+                "Falling back to HTTP/1.1 transport."
+            )
+            _http_client = httpx.AsyncClient(
+                **client_kwargs,
+                http2=False,
+            )
     return _http_client
 
 

@@ -46,6 +46,7 @@ class TokenVault:
         plaintext: str,
         data_type: str,
         agent_id: str,
+        tenant_id: str,
         ttl_hours: int | None = None,
     ) -> bool:
         """
@@ -71,6 +72,7 @@ class TokenVault:
             now = datetime.now(timezone.utc)
             vault_token = VaultToken(
                 token=token,
+                tenant_id=tenant_id,
                 ciphertext=ciphertext,
                 nonce=nonce,
                 data_type=data_type,
@@ -84,7 +86,7 @@ class TokenVault:
             await self.db.flush()
 
             logger.debug(
-                f"Stored token: {token} (type={data_type}, agent={agent_id})"
+                f"Stored token: {token} (type={data_type}, agent={agent_id}, tenant={tenant_id})"
             )
             return True
 
@@ -96,23 +98,25 @@ class TokenVault:
         self,
         token: str,
         requesting_agent_id: str,
+        tenant_id: str,
     ) -> str | None:
         """
-        Verifies agent_id matches token owner.
-        Checks token not expired or invalidated.
-        Decrypts and returns plaintext.
-        Returns None if not found.
-        Logs every retrieval attempt (success and failure).
+        Verifies tenant_id AND agent_id match before decrypting.
+        Cross-tenant retrieval returns None — structurally impossible to
+        retrieve another tenant's token even with a known token string.
         """
         try:
-            # Fetch token from DB
+            # Fetch token scoped to this tenant — cross-tenant lookup returns None
             result = await self.db.execute(
-                select(VaultToken).where(VaultToken.token == token)
+                select(VaultToken).where(
+                    VaultToken.token == token,
+                    VaultToken.tenant_id == tenant_id,
+                )
             )
             vault_token = result.scalar_one_or_none()
 
             if vault_token is None:
-                logger.warning(f"Token not found: {token}")
+                logger.warning(f"Token not found: {token} (tenant={tenant_id})")
                 return None
 
             # Authorization check — agent must match
@@ -159,6 +163,41 @@ class TokenVault:
         except Exception as e:
             logger.error(f"Failed to retrieve token {token}: {e}")
             raise VaultError(f"Failed to retrieve token: {e}") from e
+
+    async def invalidate_by_tenant(
+        self, tenant_id: str, reason: str = "tenant_offboarding"
+    ) -> int:
+        """
+        Invalidates ALL vault tokens belonging to a tenant.
+        Used in tenant deletion cascade (GDPR erasure / offboarding).
+        Returns count of invalidated tokens.
+
+        Call order in deletion cascade:
+          1. Revoke all tenant API keys (stops new requests)
+          2. invalidate_by_tenant()  ← this method
+          3. Soft-delete audit records
+          4. Mark tenant inactive
+        """
+        try:
+            from sqlalchemy import update as sa_update
+            now = datetime.now(timezone.utc)
+            result = await self.db.execute(
+                sa_update(VaultToken)
+                .where(
+                    VaultToken.tenant_id == tenant_id,
+                    VaultToken.invalidated_at.is_(None),
+                )
+                .values(invalidated_at=now)
+            )
+            count = result.rowcount
+            await self.db.flush()
+            logger.info(
+                f"Invalidated {count} vault tokens for tenant={tenant_id} (reason: {reason})"
+            )
+            return count
+        except Exception as e:
+            logger.error(f"Failed to invalidate tokens for tenant {tenant_id}: {e}")
+            raise VaultError(f"Tenant token invalidation failed: {e}") from e
 
     async def invalidate(self, token: str, reason: str) -> bool:
         """

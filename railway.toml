@@ -1,0 +1,18 @@
+# Ironpass — Railway deployment configuration
+# https://docs.railway.app/reference/config-as-code
+
+[build]
+builder = "dockerfile"
+dockerfilePath = "Dockerfile.prod"
+
+[deploy]
+# Railway injects $PORT — we use ${PORT:-8000} in the Dockerfile CMD
+# so it works both locally (8000) and on Railway (dynamic)
+healthcheckPath = "/health"
+healthcheckTimeout = 30
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 3
+
+# Tables are created via SQLAlchemy Base.metadata.create_all() in
+# the app lifespan (engine/database/connection.py init_db()).
+# No separate migration step required for initial deploy.

@@ -1,7 +1,7 @@
 """
 Pydantic models for incoming requests and outgoing responses.
 """
-from typing import Any, Optional
+from typing import Any
 from pydantic import BaseModel, Field
 
 # ---------------------------------------------------------------------------
@@ -56,6 +56,19 @@ class ComplianceViolationError(BaseModel):
     """Error format when a request is blocked"""
     violations: list[Violation]
     request_id: str
+
+
+class ActiveRulesetsUpdateRequest(BaseModel):
+    """Update active rulesets for the authenticated tenant."""
+    rulesets: list[str] = Field(
+        default_factory=list,
+        description="Full replacement list of active ruleset IDs for this tenant.",
+    )
+
+
+class ActiveRulesetsUpdateResponse(BaseModel):
+    active_rulesets: list[str]
+    invalid_rulesets: list[str] = Field(default_factory=list)
 
 # ---------------------------------------------------------------------------
 # Legacy Models (Required by interceptor.py)
