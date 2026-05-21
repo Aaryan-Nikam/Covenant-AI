@@ -5,7 +5,6 @@ import asyncio
 
 import os
 
-os.environ.setdefault("DATABASE_URL", "postgresql://x:x@localhost/x")
 os.environ.setdefault("REDIS_URL", "redis://localhost")
 os.environ.setdefault(
     "AUDIT_HMAC_KEY",

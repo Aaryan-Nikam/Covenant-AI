@@ -1,0 +1,65 @@
+.ip-suites-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: 24px;
+}
+
+.ip-suite-card {
+  display: flex;
+  flex-direction: column;
+}
+
+.ip-suite-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.ip-suite-title {
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--text-primary);
+  line-height: 1.3;
+}
+
+.ip-suite-desc {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  margin-bottom: 24px;
+}
+
+.ip-suite-modules {
+  margin-bottom: 32px;
+  flex: 1;
+}
+
+.ip-suite-module-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ip-suite-module-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+.ip-suite-actions {
+  display: flex;
+  justify-content: flex-end;
+  border-top: 1px solid var(--border-default);
+  margin: 0 -20px -20px;
+  padding: 16px 20px;
+  background: var(--bg-canvas);
+  border-bottom-left-radius: 12px;
+  border-bottom-right-radius: 12px;
+}

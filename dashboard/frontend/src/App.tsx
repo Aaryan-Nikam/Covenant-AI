@@ -16,7 +16,6 @@ import { Settings } from "./components/mockups/covenant/Settings";
 import { Login } from "./components/mockups/covenant/Login";
 import { Workspaces } from "./components/mockups/covenant/Workspaces";
 import { ComplianceLayer } from "./components/mockups/covenant/ComplianceLayer";
-import { OperationsFunctions } from "./components/mockups/covenant/OperationsFunctions";
 import { AgentSecuritySuite } from "./components/mockups/covenant/AgentSecuritySuite";
 import { Legal } from "./components/mockups/covenant/Legal";
 import { GovAnalytics } from "./components/mockups/covenant/GovAnalytics";

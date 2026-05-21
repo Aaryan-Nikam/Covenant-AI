@@ -16,7 +16,6 @@ import os
 import time
 
 # Minimal env setup for engine imports
-os.environ.setdefault("DATABASE_URL", "postgresql://x:x@localhost/x")
 os.environ.setdefault("REDIS_URL", "redis://localhost")
 os.environ.setdefault("KEY_BACKEND", "local")
 os.environ.setdefault("LOCAL_VAULT_KEY", "c" * 64)

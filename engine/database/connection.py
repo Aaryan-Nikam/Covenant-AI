@@ -5,6 +5,11 @@ Uses SQLAlchemy async engine + async sessionmaker.
 Connection pool configured for production workloads.
 """
 
+from pathlib import Path
+
+from alembic.config import Config
+from alembic.runtime.migration import MigrationContext
+from alembic.script import ScriptDirectory
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
@@ -49,6 +54,41 @@ def get_session_factory() -> async_sessionmaker[AsyncSession]:
     return _async_session_factory
 
 
+def _get_alembic_config() -> Config:
+    engine_dir = Path(__file__).resolve().parents[1]
+    alembic_cfg = Config(str(engine_dir / "alembic.ini"))
+    alembic_cfg.set_main_option(
+        "script_location",
+        str(engine_dir / "database" / "migrations"),
+    )
+    return alembic_cfg
+
+
+async def verify_migration_head(engine: AsyncEngine | None = None) -> None:
+    """
+    Refuse startup when the database is not at the Alembic head revision.
+
+    Schema is managed exclusively by migrations. This check catches deployments
+    where code was shipped before `alembic upgrade head` was run.
+    """
+    alembic_cfg = _get_alembic_config()
+    script = ScriptDirectory.from_config(alembic_cfg)
+    expected_head = script.get_current_head()
+    engine = engine or get_engine()
+
+    async with engine.connect() as conn:
+        current_revision = await conn.run_sync(
+            lambda sync_conn: MigrationContext.configure(sync_conn).get_current_revision()
+        )
+
+    if current_revision != expected_head:
+        raise RuntimeError(
+            "Database migration mismatch. "
+            f"Expected head: {expected_head}, current: {current_revision}. "
+            "Run `alembic upgrade head` before starting the application."
+        )
+
+
 async def get_db_session() -> AsyncSession:
     """
     FastAPI dependency — yields an async session.
@@ -66,24 +106,11 @@ async def get_db_session() -> AsyncSession:
 
 async def init_db() -> None:
     """
-    Initialize database — create all tables if they don't exist.
-    Called at application startup.
-    """
-    from engine.database.base import Base
-    # Import all models so they register with Base.metadata
-    import engine.vault.models  # noqa: F401
-    import engine.audit.models  # noqa: F401
-    import engine.auth.models   # noqa: F401  — Tenant, TenantAPIKey
-    import engine.compliance.models  # noqa: F401
-    import engine.agent_security.models  # noqa: F401
+    Verify database schema is ready for application startup.
 
-    from sqlalchemy import text
-    engine = get_engine()
-    async with engine.begin() as conn:
-        # Create non-public schemas first (Railway Postgres only has 'public' by default)
-        await conn.execute(text("CREATE SCHEMA IF NOT EXISTS audit"))
-        await conn.execute(text("CREATE SCHEMA IF NOT EXISTS vault"))
-        await conn.run_sync(Base.metadata.create_all)
+    Schema is managed exclusively by Alembic migrations.
+    """
+    await verify_migration_head()
 
 
 async def close_db() -> None:

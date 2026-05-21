@@ -16,6 +16,7 @@ import logging
 from datetime import datetime
 
 from engine.config import get_settings
+from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger("ironpass.audit.signer")
 
@@ -137,3 +138,27 @@ class AuditSigner:
             )
 
         return True, None
+
+
+async def write_audit_entry(db: AsyncSession, payload: dict) -> None:
+    """
+    Administrative audit trail.
+    Routes admin events through the same immutable HMAC chain as proxy requests.
+    """
+    from engine.audit.logger import AuditLogger
+    import json
+    
+    logger = AuditLogger(db)
+    request_content = json.dumps(payload, sort_keys=True)
+    
+    await logger.log_request(
+        agent_id=payload.get('actor_type', 'system'),
+        request_content=request_content,
+        rulesets_used=[],
+        detections=[],
+        actions_taken=[],
+        was_blocked=False,
+        target_url="admin_action",
+        latency_ms=0,
+        outcome=payload.get('action', 'admin_event')
+    )

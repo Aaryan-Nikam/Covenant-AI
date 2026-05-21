@@ -27,6 +27,7 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
+    UniqueConstraint,
 )
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB, UUID
 
@@ -53,6 +54,7 @@ class AuditLog(Base):
         Index("idx_audit_outcome", "outcome", "timestamp"),
         # GIN index for array column (rulesets_used)
         Index("idx_audit_rulesets", "rulesets_used", postgresql_using="gin"),
+        UniqueConstraint("entry_id", name="uq_audit_log_entry_id"),
         {"schema": "audit"},
     )
 
@@ -62,7 +64,6 @@ class AuditLog(Base):
     # Unique entry identifier
     entry_id = Column(
         UUID(as_uuid=True),
-        unique=True,
         nullable=False,
         default=uuid.uuid4,
     )

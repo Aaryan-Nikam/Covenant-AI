@@ -22,7 +22,6 @@ print()
 
 # Test 2: AES-256-GCM encryption round-trip
 import os
-os.environ.setdefault('DATABASE_URL', 'postgresql://x:x@localhost/x')
 os.environ.setdefault('REDIS_URL', 'redis://localhost')
 os.environ.setdefault('AUDIT_HMAC_KEY', 'a' * 64)
 os.environ.setdefault('PSEUDONYM_SECRET_KEY', 'b' * 64)

@@ -6,6 +6,68 @@ on:
   workflow_dispatch:
 
 jobs:
+  backend_quality:
+    name: Backend Quality
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: ironpass
+          POSTGRES_PASSWORD: secret
+          POSTGRES_DB: ironpass
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ironpass -d ironpass"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://ironpass:secret@localhost:5432/ironpass
+      REDIS_URL: redis://localhost:6379/0
+      AUDIT_HMAC_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+      PSEUDONYM_SECRET_KEY: abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789
+      KEY_BACKEND: local
+      LOCAL_VAULT_KEY: 1111111111111111111111111111111111111111111111111111111111111111
+      IRONPASS_ADMIN_SECRET: ci_admin_secret
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: engine/requirements.txt
+
+      - name: Install backend dependencies
+        run: python -m pip install -r engine/requirements.txt
+
+      - name: Verify no startup schema creation
+        run: |
+          if grep -rn "create_all" engine/ --include="*.py" | grep -v "database/migrations"; then
+            echo "ERROR: create_all found outside Alembic migrations. Schema must be managed by migrations only."
+            exit 1
+          fi
+
+      - name: Run migrations
+        run: alembic -c engine/alembic.ini upgrade head
+
+      - name: Verify migration rollback cycle
+        run: |
+          alembic -c engine/alembic.ini downgrade -1
+          alembic -c engine/alembic.ini upgrade head
+
+      - name: Verify migrations match models
+        run: alembic -c engine/alembic.ini check
+
+      - name: Run backend tests
+        run: pytest -q
+
   build_frontend:
     name: Build Frontend
     runs-on: ubuntu-latest
@@ -39,7 +101,7 @@ jobs:
 
   deploy_cloudflare:
     name: Deploy to Cloudflare Pages
-    needs: build_frontend
+    needs: [backend_quality, build_frontend]
     runs-on: ubuntu-latest
     permissions:
       contents: read

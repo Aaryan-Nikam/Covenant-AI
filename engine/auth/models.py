@@ -152,3 +152,33 @@ def generate_api_key() -> tuple[str, str, str]:
 def hash_api_key(raw_key: str) -> str:
     """Hash a raw API key for DB lookup."""
     return hashlib.sha256(raw_key.encode()).hexdigest()
+
+class User(Base):
+    """
+    Dashboard user associated with a Tenant.
+    Logs in via email/password.
+    """
+    __tablename__ = "users"
+    __table_args__ = {"schema": "public"}
+
+    id = Column(
+        String(36),
+        primary_key=True,
+        default=lambda: str(uuid.uuid4()),
+    )
+    email = Column(String(255), unique=True, nullable=False)
+    hashed_password = Column(String(255), nullable=False)
+    tenant_id = Column(
+        String(36),
+        ForeignKey("public.tenants.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    is_active = Column(Boolean, nullable=False, default=True)
+    created_at = Column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=datetime.utcnow,
+    )
+
+    tenant = relationship("Tenant", backref="users")
+

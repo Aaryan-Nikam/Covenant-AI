@@ -1,0 +1,11 @@
+.ip-legal-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 24px;
+}
+
+.ip-tag--danger {
+  color: var(--status-blocked-text);
+  border-color: #FECACA;
+  background: var(--status-blocked-bg);
+}

@@ -11,6 +11,7 @@ Ironpass is a FastAPI-based multi-tenant compliance platform with two primary pr
 
 The app also includes:
 - Agent Security Suite (prompt injection, exfiltration, least-privilege tools, memory hygiene)
+- Unified Decisioning API (single signed compliance+security decision contract)
 - Admin provisioning APIs (tenant + key lifecycle)
 - Tenant audit query APIs
 - Dashboard backend APIs for operational visibility
@@ -22,7 +23,7 @@ The app also includes:
 - Framework: FastAPI
 - DB access: SQLAlchemy async engine/sessionmaker
 - Startup lifecycle:
-  - initializes DB schemas/tables (`init_db`)
+  - verifies the live DB is at Alembic head (`init_db`)
   - pre-warms shared HTTP client pool
   - loads rulesets from YAML
 - Middleware and platform controls:
@@ -45,6 +46,7 @@ The current model footprint is:
 - Proxy router: 8 endpoints
 - Compliance router: 44 endpoints
 - Agent Security router: 8 endpoints
+- Unified Decisions router: 1 endpoint
 - Admin router: 6 endpoints
 - Logs router: 2 endpoints
 - Dashboard backend router: 6 endpoints
@@ -182,6 +184,33 @@ Action resolution:
 Idempotency behavior:
 - decision logs keyed by `tenant_id + request_id`
 - repeated `request_id` returns existing persisted decision
+
+## 5.3 Unified Compliance+Security Decision (New)
+Base route: `/v1/decisions`
+
+Endpoint:
+- `POST /evaluate`
+
+What it does:
+- runs agent-security composite decisioning
+- runs PII detection (regex/luhn/NER) against tenant-active rulesets
+- computes weighted unified risk:
+  - pii detection: 20%
+  - prompt injection: 30%
+  - exfiltration: 25%
+  - tool permissions: 15%
+  - memory hygiene: 10%
+- returns one signed decision contract:
+  - `allow | review | block`
+  - component risk breakdown
+  - normalized evidence list
+  - applied actions
+  - audit trail link (`audit_entry_id`)
+
+Persistence and idempotency:
+- new table: `public.unified_decision_logs`
+- uniqueness key: `tenant_id + request_id`
+- repeated request IDs return the existing stored payload
 
 ## 6) Function Suite (9/9 Implemented)
 Base route: `/v1/compliance`

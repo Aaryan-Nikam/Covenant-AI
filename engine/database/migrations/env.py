@@ -28,12 +28,52 @@ from engine.database.base import Base
 # Import all models so they register with Base.metadata
 from engine.auth.models import Tenant, TenantAPIKey
 from engine.audit.models import AuditLog
+from engine.vault.models import VaultToken
+from engine.compliance.models import (
+    AMLSignal,
+    ComplianceCase,
+    ComplianceCaseEvent,
+    SARReport,
+    FinancialCovenant,
+    FinancialSnapshot,
+    CovenantEvaluation,
+    GDPRRetentionPolicy,
+    GDPRRetentionSnapshot,
+    GDPRRetentionFinding,
+    GDPRProcessingActivity,
+    SLAContract,
+    SLASnapshot,
+    SLAEvaluation,
+    RDTaxActivity,
+    RDTaxAssessment,
+    ESGMetric,
+    ESGCSRDSubmission,
+    SupplierProfile,
+    SupplierRiskAssessment,
+    HSIncident,
+    HSRiddorAssessment,
+    CompetitorProfile,
+    CompetitorSignalAssessment,
+)
+from engine.agent_security.models import AgentSecurityDecisionLog, AgentSecurityPolicy
+from engine.decisions.models import UnifiedDecisionLog
+from engine.deletion.models import TenantDeletionJob, TenantDeletionJobStep
+from engine.agent_security.policy_version_model import TenantPolicyVersion
 from engine.config import get_settings
 
 target_metadata = Base.metadata
 
 settings = get_settings()
 config.set_main_option("sqlalchemy.url", settings.async_database_url)
+
+
+def include_object(object_, name, type_, reflected, compare_to):
+    """Filter known Alembic noise without hiding table/column drift."""
+    if type_ == "foreign_key_constraint":
+        table = getattr(object_, "table", None)
+        if getattr(table, "name", None) == "tenant_api_keys":
+            return False
+    return True
 
 # other values from the config, defined by the needs of env.py,
 # can be acquired:
@@ -57,6 +97,8 @@ def run_migrations_offline() -> None:
     context.configure(
         url=url,
         target_metadata=target_metadata,
+        include_schemas=True,
+        include_object=include_object,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
     )
@@ -66,7 +108,12 @@ def run_migrations_offline() -> None:
 
 
 def do_run_migrations(connection: Connection) -> None:
-    context.configure(connection=connection, target_metadata=target_metadata)
+    context.configure(
+        connection=connection,
+        target_metadata=target_metadata,
+        include_schemas=True,
+        include_object=include_object,
+    )
 
     with context.begin_transaction():
         context.run_migrations()

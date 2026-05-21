@@ -1,0 +1,53 @@
+.ip-gov-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.ip-metric-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ip-metric-label {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.ip-metric-value-row {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.ip-metric-value {
+  font-family: var(--font-serif);
+  font-size: 32px;
+  color: var(--text-primary);
+  line-height: 1.2;
+}
+
+.ip-metric-trend {
+  font-size: 12px;
+  font-family: var(--font-mono);
+  font-weight: 500;
+}
+.ip-metric-trend--passed { color: var(--status-passed-text); }
+.ip-metric-trend--blocked { color: var(--status-blocked-text); }
+.ip-metric-trend--neutral { color: var(--text-secondary); }
+
+.ip-gov-chart-placeholder {
+  height: 250px;
+  border: 1px dashed var(--border-strong);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  background: var(--bg-canvas);
+  color: var(--text-tertiary);
+  font-size: 13px;
+}

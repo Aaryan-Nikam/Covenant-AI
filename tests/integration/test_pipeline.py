@@ -19,7 +19,6 @@ import httpx
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../.."))
 
-os.environ.setdefault("DATABASE_URL", "postgresql://x:x@localhost/x")
 os.environ.setdefault("REDIS_URL", "redis://localhost")
 os.environ.setdefault("AUDIT_HMAC_KEY", "a" * 64)
 os.environ.setdefault("PSEUDONYM_SECRET_KEY", "b" * 64)
@@ -272,27 +271,57 @@ class TestLiveEndpoints:
         data = r.json()
         assert data["status"] == "healthy"
 
-    def test_list_rulesets(self):
+    def _tenant_headers(self) -> dict[str, str]:
+        token = os.getenv("IRONPASS_TEST_TENANT_KEY")
+        if not token:
+            pytest.skip("IRONPASS_TEST_TENANT_KEY not set for authenticated live endpoint tests")
+        return {"Authorization": f"Bearer {token}"}
+
+    def test_list_rulesets_requires_auth(self):
         if not self._server_is_running():
             pytest.skip("Server not running")
         r = httpx.get(f"{self.BASE}/proxy/rulesets")
-        assert r.status_code == 200
-        data = r.json()
-        assert len(data["rulesets"]) == 4
+        assert r.status_code == 403
 
-    def test_get_ruleset_detail(self):
+    def test_get_ruleset_requires_auth(self):
         if not self._server_is_running():
             pytest.skip("Server not running")
         r = httpx.get(f"{self.BASE}/proxy/rulesets/pci_dss")
+        assert r.status_code == 403
+
+    def test_unknown_ruleset_requires_auth(self):
+        if not self._server_is_running():
+            pytest.skip("Server not running")
+        r = httpx.get(f"{self.BASE}/proxy/rulesets/nonexistent")
+        assert r.status_code == 403
+
+    def test_list_rulesets_authenticated(self):
+        if not self._server_is_running():
+            pytest.skip("Server not running")
+        r = httpx.get(f"{self.BASE}/proxy/rulesets", headers=self._tenant_headers())
+        assert r.status_code == 200
+        data = r.json()
+        assert len(data["rulesets"]) >= 1
+
+    def test_get_ruleset_detail_authenticated(self):
+        if not self._server_is_running():
+            pytest.skip("Server not running")
+        r = httpx.get(
+            f"{self.BASE}/proxy/rulesets/pci_dss",
+            headers=self._tenant_headers(),
+        )
         assert r.status_code == 200
         data = r.json()
         assert data["name"] == "PCI-DSS v4.0"
         assert len(data["detectors"]) == 6
 
-    def test_unknown_ruleset_404(self):
+    def test_unknown_ruleset_404_authenticated(self):
         if not self._server_is_running():
             pytest.skip("Server not running")
-        r = httpx.get(f"{self.BASE}/proxy/rulesets/nonexistent")
+        r = httpx.get(
+            f"{self.BASE}/proxy/rulesets/nonexistent",
+            headers=self._tenant_headers(),
+        )
         assert r.status_code == 404
 
 

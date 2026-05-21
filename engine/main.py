@@ -55,6 +55,26 @@ except Exception:
 # Application Lifespan
 # ---------------------------------------------------------------------------
 
+async def recover_stale_deletion_jobs(db):
+    """Reset in_progress jobs older than 5 minutes — handles crash recovery."""
+    from datetime import timedelta, datetime, timezone
+    from sqlalchemy import update
+    from engine.deletion.models import TenantDeletionJob
+
+    cutoff = datetime.now(timezone.utc) - timedelta(minutes=5)
+    result = await db.execute(
+        update(TenantDeletionJob)
+        .where(
+            TenantDeletionJob.status == 'in_progress',
+            TenantDeletionJob.initiated_at < cutoff
+        )
+        .values(status='pending')
+    )
+    await db.commit()
+    if result.rowcount:
+        logger.warning(f'Reset {result.rowcount} stale deletion jobs to pending on startup')
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
@@ -74,10 +94,15 @@ async def lifespan(app: FastAPI):
 
     try:
         await init_db()
-        logger.info("Database initialized")
+        logger.info("Database migration head verified")
+        
+        from engine.database.connection import get_session_factory
+        session_factory = get_session_factory()
+        async with session_factory() as session:
+            await recover_stale_deletion_jobs(session)
     except Exception as e:
-        logger.warning(f"Database not available at startup: {e}")
-        logger.warning("Health check will work, but proxy features require the database")
+        logger.error(f"Database migration verification failed: {e}")
+        raise
 
     # Pre-warm the shared HTTP client so the first request doesn't pay init cost
     try:
@@ -158,6 +183,10 @@ app.add_middleware(
 # Router Mounting (phased)
 # ---------------------------------------------------------------------------
 
+# Auth router (dashboard login)
+from engine.auth.router import router as auth_router  # noqa: E402
+app.include_router(auth_router, tags=["auth"])
+
 # Proxy router (includes /openai/* and /proxy/* endpoints)
 from engine.proxy.router import router as proxy_router  # noqa: E402
 app.include_router(proxy_router, tags=["proxy"])
@@ -177,6 +206,18 @@ app.include_router(compliance_router, tags=["compliance"])
 # Agent Security Suite router
 from engine.agent_security.router import router as agent_security_router  # noqa: E402
 app.include_router(agent_security_router, tags=["agent-security"])
+
+# Policy version router
+from engine.agent_security.policy_version_router import router as policy_version_router  # noqa: E402
+app.include_router(policy_version_router, tags=["policy-versions"])
+
+# Unified decisioning router
+from engine.decisions.router import router as decisions_router  # noqa: E402
+app.include_router(decisions_router, tags=["decisions"])
+
+# Tenant deletion router
+from engine.deletion.router import router as deletion_router  # noqa: E402
+app.include_router(deletion_router, tags=["deletion"])
 
 # Dashboard router
 try:

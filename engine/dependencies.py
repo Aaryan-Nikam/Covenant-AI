@@ -14,8 +14,10 @@ from fastapi import Depends, HTTPException, Security
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from engine.auth.models import Tenant
+from engine.auth.models import Tenant, User
 from engine.auth.service import authenticate_request
+from engine.auth.jwt import decode_access_token
+from sqlalchemy import select
 from engine.config import Settings, get_settings
 from engine.database.connection import get_session_factory
 from engine.detection.engine import DetectionEngine
@@ -75,12 +77,31 @@ async def verify_api_key(
     db: AsyncSession = Depends(get_db),
 ) -> Tenant:
     """
-    Authenticates the request by hashing the bearer token and looking
-    it up in the tenant_api_keys table. Returns the associated Tenant.
-
-    Raises HTTP 401 for any invalid/expired/revoked key.
+    Authenticates the request by either a dbnc_live_ API key or a JWT.
+    Returns the associated Tenant.
+    Raises HTTP 401 for any invalid/expired/revoked key or token.
     """
-    return await authenticate_request(raw_key=credentials.credentials, db=db)
+    token = credentials.credentials
+    if token.startswith("dbnc_live_"):
+        return await authenticate_request(raw_key=token, db=db)
+    
+    # Try decoding as JWT
+    payload = decode_access_token(token)
+    if not payload or "tenant_id" not in payload:
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid authentication token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    tenant_id = payload.get("tenant_id")
+    res = await db.execute(select(Tenant).where(Tenant.id == tenant_id))
+    tenant = res.scalar_one_or_none()
+    
+    if not tenant or not tenant.is_active:
+        raise HTTPException(status_code=401, detail="Invalid or inactive tenant")
+        
+    return tenant
 
 
 async def verify_dashboard_api_key(
@@ -160,6 +181,11 @@ def _get_detection_engine() -> DetectionEngine:
     if _detection_engine is None:
         _detection_engine = DetectionEngine(get_registry())
     return _detection_engine
+
+
+def get_detection_engine() -> DetectionEngine:
+    """FastAPI dependency for the shared detection engine singleton."""
+    return _get_detection_engine()
 
 
 def get_interceptor(db: AsyncSession = Depends(get_db)) -> ProxyInterceptor:

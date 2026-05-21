@@ -34,7 +34,6 @@ from dataclasses import asdict, dataclass
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
 # Minimal env setup for engine imports (no DB needed)
-os.environ.setdefault("DATABASE_URL", "postgresql://x:x@localhost/x")
 os.environ.setdefault("REDIS_URL", "redis://localhost")
 os.environ.setdefault("AUDIT_HMAC_KEY", "a" * 64)
 os.environ.setdefault("PSEUDONYM_SECRET_KEY", "b" * 64)

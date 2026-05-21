@@ -3,7 +3,6 @@ import sys
 sys.path.insert(0, '.')
 
 import os
-os.environ.setdefault('DATABASE_URL', 'postgresql://x:x@localhost/x')
 os.environ.setdefault('REDIS_URL', 'redis://localhost')
 os.environ.setdefault('AUDIT_HMAC_KEY', 'a' * 64)
 os.environ.setdefault('PSEUDONYM_SECRET_KEY', 'b' * 64)
