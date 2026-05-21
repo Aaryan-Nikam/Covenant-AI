@@ -121,7 +121,7 @@ function ProxySettings() {
       <SettingsSection title="Proxy Endpoint">
         <SettingsRow label="Proxy URL" desc="Point your agents at this URL instead of the LLM provider directly">
           <div style={{ display: "flex", gap: 8, width: 320 }}>
-            <input className="ip-input ip-mono" value="https://api.ironpass.io/v1" readOnly style={{ fontFamily: "var(--font-mono)", fontSize: 12, flex: 1 }} />
+            <input className="ip-input ip-mono" value="https://api.covenant.io/v1" readOnly style={{ fontFamily: "var(--font-mono)", fontSize: 12, flex: 1 }} />
             <button className="ip-btn-ghost" style={{ padding: "7px 10px", flexShrink: 0 }}>Copy</button>
           </div>
         </SettingsRow>

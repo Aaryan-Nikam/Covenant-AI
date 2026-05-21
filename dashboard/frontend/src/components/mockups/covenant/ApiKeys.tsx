@@ -85,7 +85,7 @@ export function ApiKeys() {
       <div className="ip-page-header">
         <div className="ip-page-header-left">
           <div className="ip-page-title">API Keys</div>
-          <div className="ip-page-subtitle">Authentication credentials for Ironpass proxy access</div>
+          <div className="ip-page-subtitle">Authentication credentials for Covenant AI proxy access</div>
         </div>
         <div className="ip-page-header-actions">
           <button className="ip-btn-primary" onClick={openModal}>Issue new key</button>
@@ -159,12 +159,12 @@ export function ApiKeys() {
         {/* Usage snippet */}
         <div className="ip-sheet ip-usage-snippet">
           <div className="ip-section-heading" style={{ marginBottom: 10 }}>Usage</div>
-          <pre className="ip-usage-code">{`curl https://api.ironpass.io/v1/chat/completions \\
+          <pre className="ip-usage-code">{`curl https://api.covenant.io/v1/chat/completions \\
   -H "Authorization: Bearer dbnc_live_a3f2d1c8..." \\
   -H "Content-Type: application/json" \\
   -d '{"model":"gpt-4o","messages":[...]}'`}</pre>
           <div style={{ fontSize: 12, color: "var(--text-tertiary)", marginTop: 8 }}>
-            Drop-in replacement for the OpenAI API — change only the base URL and add your Ironpass key.
+            Drop-in replacement for the OpenAI API — change only the base URL and add your Covenant AI key.
           </div>
         </div>
       </div>

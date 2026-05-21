@@ -116,7 +116,7 @@ export function TestConsole() {
                   </svg>
                 </div>
                 <div className="ip-console-empty-title">Results will appear here.</div>
-                <div className="ip-console-empty-sub">Enter text on the left and run the analysis<br />to see exactly what Ironpass would do.</div>
+                <div className="ip-console-empty-sub">Enter text on the left and run the analysis<br />to see exactly what Covenant AI would do.</div>
               </div>
             ) : (
               <div className="ip-console-results">

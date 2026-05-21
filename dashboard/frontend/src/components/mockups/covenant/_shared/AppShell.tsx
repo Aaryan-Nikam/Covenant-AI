@@ -1,90 +1,83 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
+import logoUrl from "../../../../assets/logo.svg";
 import "./_shared.css";
 
 type NavPage =
-  | "compliance-layer"
-  | "operations-functions"
-  | "agent-security-suite"
   | "dashboard"
   | "audit"
   | "violations"
-  | "agents"
+  | "reports"
   | "frameworks"
   | "policies"
+  | "legal"
   | "guardrails"
-  | "governance"
-  | "console"
-  | "reports"
-  | "api-keys"
-  | "team"
-  | "settings";
+  | "agent-security-suite"
+  | "gov-analytics"
+  | "functions-tools"
+  | "industry-suites"
+  | "console";
 
 interface AppShellProps {
-  activePage: NavPage;
   children: React.ReactNode;
-  onNavigate?: (page: NavPage) => void;
 }
 
 const navGroups = [
   {
-    label: "Product",
-    items: [
-      { id: "compliance-layer" as NavPage, label: "Core Layer" },
-      { id: "operations-functions" as NavPage, label: "Function Suite" },
-      { id: "agent-security-suite" as NavPage, label: "Agent Security" },
-    ],
-  },
-  {
-    label: "Monitor",
+    label: "Core",
     items: [
       { id: "dashboard" as NavPage, label: "Dashboard" },
       { id: "audit" as NavPage, label: "Audit Log" },
       { id: "violations" as NavPage, label: "Violations", badge: 3 },
-      { id: "agents" as NavPage, label: "Agents" },
+      { id: "reports" as NavPage, label: "Reports & Analytics" },
     ],
   },
   {
     label: "Compliance",
     items: [
-      { id: "frameworks" as NavPage, label: "Frameworks" },
+      { id: "frameworks" as NavPage, label: "Frameworks & Guidelines" },
       { id: "policies" as NavPage, label: "Policies" },
+      { id: "legal" as NavPage, label: "Legal" },
+    ],
+  },
+  {
+    label: "Governance",
+    items: [
       { id: "guardrails" as NavPage, label: "Guardrails" },
-      { id: "governance" as NavPage, label: "Governance" },
+      { id: "agent-security-suite" as NavPage, label: "Agent Security" },
+      { id: "gov-analytics" as NavPage, label: "Analytics" },
     ],
   },
   {
-    label: "Tools",
+    label: "Products & Tools",
     items: [
+      { id: "functions-tools" as NavPage, label: "Functions & Tools" },
+      { id: "industry-suites" as NavPage, label: "Industry Suites" },
       { id: "console" as NavPage, label: "Test Console", accent: true },
-      { id: "reports" as NavPage, label: "Reports" },
-    ],
-  },
-  {
-    label: "Account",
-    items: [
-      { id: "api-keys" as NavPage, label: "API Keys" },
-      { id: "team" as NavPage, label: "Team" },
-      { id: "settings" as NavPage, label: "Settings" },
     ],
   },
 ];
 
 export function AppShell({ children }: AppShellProps) {
-  // Override activePage and onNavigate to use hash routing globally for the mockups
-  const activePage = window.location.hash.slice(1) || "compliance-layer";
+  const [activePage, setActivePage] = useState<NavPage>("dashboard");
+
+  useEffect(() => {
+    const hash = window.location.hash.slice(1) as NavPage;
+    if (hash) {
+      setActivePage(hash);
+    }
+  }, []);
+
   const handleNavigate = (page: NavPage) => {
     window.location.hash = page;
+    setActivePage(page);
   };
 
   return (
     <div className="ip-shell">
       <nav className="ip-sidebar">
         <div className="ip-logo-area">
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="ip-logo-icon">
-            <path d="M8 1L2 3.5V8.5C2 11.5 4.7 13.9 8 15C11.3 13.9 14 11.5 14 8.5V3.5L8 1Z" stroke="#141414" strokeWidth="1.4" strokeLinejoin="round" fill="none"/>
-            <path d="M5.5 8L7 9.5L10.5 6" stroke="#141414" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-          <span className="ip-logo-text">Ironpass</span>
+          <img src={logoUrl} alt="Covenant AI Logo" className="ip-logo-icon" style={{width: 24, height: 24, objectFit: 'contain'}} />
+          <span className="ip-logo-text">Covenant AI</span>
         </div>
 
         <div className="ip-nav">
@@ -115,7 +108,7 @@ export function AppShell({ children }: AppShellProps) {
             <span className="ip-status-dot ip-status-dot--active" />
             <span className="ip-status-label">PROXY ACTIVE</span>
           </div>
-          <div className="ip-status-url">api.ironpass.io</div>
+          <div className="ip-status-url">api.covenant.io</div>
         </div>
       </nav>
 

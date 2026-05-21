@@ -97,7 +97,7 @@ function outcomeClass(o: string) {
 
 const exploreCards = [
   { icon: "⊞", title: "Audit Log", tag: null, desc: "Full cryptographically-signed request history. Every proxy event, tamper-evident." },
-  { icon: "≋", title: "Test Console", tag: "Try it", desc: "Paste any text and see exactly what Ironpass detects and sanitizes in real time." },
+  { icon: "≋", title: "Test Console", tag: "Try it", desc: "Paste any text and see exactly what Covenant AI detects and sanitizes in real time." },
   { icon: "◎", title: "Frameworks", tag: null, desc: "Activate PCI-DSS, HIPAA, GDPR and other compliance frameworks with one toggle." },
   { icon: "⊡", title: "API Keys", tag: null, desc: "Issue and manage proxy credentials. Keys are shown once — store them securely." },
 ];

@@ -1,5 +1,5 @@
 /**
- * Ironpass Dashboard — API client
+ * Covenant AI Dashboard — API client
  *
  * Wraps all calls to the FastAPI engine backend.
  * The IRONPASS_API_KEY is read from VITE_API_KEY env var for local dev,
@@ -10,7 +10,7 @@ const BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
 
 function getApiKey(): string {
   return (
-    sessionStorage.getItem("ironpass_api_key") ||
+    sessionStorage.getItem("covenant_api_key") ||
     import.meta.env.VITE_API_KEY ||
     ""
   );
