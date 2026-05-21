@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import logoUrl from "../../../assets/logo.svg";
+import logoUrl from "../../../assets/govern_logo.png";
 import "./_shared/_shared.css";
 import "./Login.css";
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import logoUrl from "../../../../assets/logo.svg";
+import logoUrl from "../../../../assets/govern_logo.png";
 import "./_shared.css";
 
 type NavPage =
