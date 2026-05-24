@@ -1,5 +1,5 @@
 import React from "react";
-import logoUrl from "../../../assets/govern_logo.svg";
+import logoUrl from "../../../assets/final_logo.png";
 import "./_shared/_shared.css";
 import "./Workspaces.css";
 
