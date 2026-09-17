@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 import uuid
 import logging
 
-from engine.database.connection import get_db
+from engine.dependencies import get_db, verify_api_key
 from engine.gdpr.models import ErasureRequest, PiiDataRecord
 from engine.auth.models import Tenant
 from engine.dependencies import verify_api_key

@@ -14,7 +14,7 @@ from pydantic import BaseModel
 from sqlalchemy import select, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from engine.database.connection import get_db
+from engine.dependencies import get_db, verify_api_key
 from engine.sla.models import SLAPolicy, SLABreach, MetricType
 from engine.auth.models import Tenant
 from engine.dependencies import verify_api_key
