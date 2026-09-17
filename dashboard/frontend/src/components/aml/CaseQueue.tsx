@@ -81,7 +81,14 @@ export function CaseQueue({ onSelectCase, selectedCaseId }: Props) {
                 <span className="text-xs font-mono text-gray-400 truncate">
                   {c.id.slice(0, 8)}...
                 </span>
-                <RiskScoreBadge score={c.risk_score} />
+                <div className="flex items-center gap-1">
+                  {c.source && (
+                    <span className={`px-1.5 py-0.5 text-[10px] font-medium rounded ${c.source === 'proxy_intercept' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-700'}`}>
+                      {c.source === 'proxy_intercept' ? 'Proxy Intercept' : 'API'}
+                    </span>
+                  )}
+                  <RiskScoreBadge score={c.risk_score} />
+                </div>
               </div>
               <div className="mt-1 flex items-center gap-2">
                 <StatusBadge status={c.status} />

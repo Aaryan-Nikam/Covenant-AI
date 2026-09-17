@@ -80,6 +80,13 @@ class DashboardService:
         )
         avg_latency = avg_latency_result.scalar() or 0
 
+        # Failed audit log count — health metric for audit reliability
+        from engine.audit.models import FailedAuditLog
+        failed_audit_result = await self.db.execute(
+            select(func.count(FailedAuditLog.id))
+        )
+        failed_audit_count = failed_audit_result.scalar() or 0
+
         return {
             "tenant_id": tenant.id,
             "total_requests": total_requests,
@@ -92,6 +99,7 @@ class DashboardService:
                 1,
             ),
             "active_rulesets_count": len(tenant.active_rulesets or []),
+            "failed_audit_count": failed_audit_count,
         }
 
     async def get_violations(

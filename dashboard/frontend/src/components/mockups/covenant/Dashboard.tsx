@@ -12,13 +12,13 @@ import {
 type DateRange = "1d" | "7d" | "30d" | "all";
 
 // ---------------------------------------------------------------------------
-// Static fallback data (used when API is unreachable in dev mode)
+// Initial empty state (no mock data — real data only)
 // ---------------------------------------------------------------------------
-const FALLBACK_KPIS = [
-  { label: "Total Requests", value: "48,291", delta: "+12% vs last period", up: true },
-  { label: "Masked", value: "3,847", delta: "8.0% of requests", up: null },
-  { label: "Blocked", value: "214", delta: "0.44% of requests", up: null },
-  { label: "Avg Latency", value: "138ms", delta: "−6ms vs last period", up: true },
+const EMPTY_KPIS = [
+  { label: "Total Requests", value: "—", delta: "No data yet", up: null },
+  { label: "Active Vault Tokens", value: "—", delta: "No data yet", up: null },
+  { label: "Blocked", value: "—", delta: "No data yet", up: null },
+  { label: "Avg Latency", value: "—", delta: "No data yet", up: null },
 ];
 
 const requestData = [
@@ -110,10 +110,11 @@ export function Dashboard() {
   const [activePage, setActivePage] = useState<any>("dashboard");
 
   // Live data state
-  const [kpis, setKpis] = useState(FALLBACK_KPIS);
+  const [kpis, setKpis] = useState(EMPTY_KPIS);
   const [recentLogs, setRecentLogs] = useState<AuditEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [apiLive, setApiLive] = useState(false);
+  const [apiError, setApiError] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -128,8 +129,9 @@ export function Dashboard() {
         setKpis(buildKpis(overview));
         setRecentLogs(auditResp.entries);
         setApiLive(true);
+        setApiError(false);
       } catch {
-        // Backend unreachable — keep fallback data silently
+        if (!cancelled) setApiError(true);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -147,11 +149,20 @@ export function Dashboard() {
           <div className="ip-page-subtitle">
             Proxy traffic overview and system health
             {apiLive && <span style={{ marginLeft: 8, fontSize: 11, color: "var(--status-passed-dot)" }}>● Live</span>}
-            {!apiLive && !loading && <span style={{ marginLeft: 8, fontSize: 11, color: "var(--text-tertiary)" }}>● Demo mode</span>}
+            {apiError && !loading && <span style={{ marginLeft: 8, fontSize: 11, color: "#EF4444" }}>● Disconnected</span>}
           </div>
         </div>
         <div className="ip-page-header-actions">
           <div className="ip-date-range-group">
+
+      {apiError && !loading && (
+        <div className="ip-sheet" style={{ padding: "14px 20px", marginBottom: 16, background: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.18)", borderRadius: 8 }}>
+          <span style={{ fontSize: 13, color: "#EF4444", fontWeight: 500 }}>⚠ Backend unreachable</span>
+          <span style={{ fontSize: 12, color: "var(--text-secondary)", marginLeft: 12 }}>
+            Connect your backend to see live data. Metrics below are empty until a connection is established.
+          </span>
+        </div>
+      )}
             <button className="ip-btn-ghost ip-date-range-pill">Pick a date range ▾</button>
             {(["1d", "7d", "30d"] as DateRange[]).map(r => (
               <button
@@ -236,8 +247,8 @@ export function Dashboard() {
               </tr>
             </thead>
             <tbody>
-              {apiLive && recentLogs.length > 0
-                ? recentLogs.map((log) => (
+              {recentLogs.length > 0 ? (
+                recentLogs.map((log) => (
                   <tr key={log.entry_id}>
                     <td><span className="ip-mono" style={{ fontSize: 12 }}>{new Date(log.timestamp).toLocaleTimeString()}</span></td>
                     <td><span className="ip-mono" style={{ fontSize: 11, color: "var(--text-secondary)" }}>{log.agent_id.slice(0, 14)}…</span></td>
@@ -255,29 +266,13 @@ export function Dashboard() {
                     </td>
                   </tr>
                 ))
-                : [
-                  { t: "14:32:07", a: "agent_prod_v2_a9f3", o: "masked", d: "2 detected", l: 142 },
-                  { t: "14:31:54", a: "agent_prod_v2_a9f3", o: "passed", d: "—", l: 38 },
-                  { t: "14:31:22", a: "agent_stg_b7c2_x1", o: "blocked", d: "3 detected", l: 201 },
-                  { t: "14:30:48", a: "agent_prod_c4d3", o: "masked", d: "1 detected", l: 97 },
-                  { t: "14:30:31", a: "agent_prod_v2_a9f3", o: "passed", d: "—", l: 44 },
-                ].map((r, i) => (
-                  <tr key={i}>
-                    <td><span className="ip-mono" style={{ fontSize: 12 }}>{r.t}</span></td>
-                    <td><span className="ip-mono" style={{ fontSize: 11, color: "var(--text-secondary)" }}>{r.a.slice(0, 14)}…</span></td>
-                    <td>
-                      <span className={`ip-badge ip-badge--${r.o}`}>
-                        <span className="ip-badge-dot" />
-                        {r.o.charAt(0).toUpperCase() + r.o.slice(1)}
-                      </span>
-                    </td>
-                    <td><span style={{ fontSize: 13, color: r.d === "—" ? "var(--text-tertiary)" : undefined }}>{r.d}</span></td>
-                    <td>
-                      <span className={`ip-mono ip-latency--${r.l < 200 ? "normal" : "warn"}`} style={{ fontSize: 12 }}>{r.l}ms</span>
-                    </td>
-                  </tr>
-                ))
-              }
+              ) : (
+                <tr>
+                  <td colSpan={5} style={{ textAlign: "center", padding: "40px 0", color: "var(--text-tertiary)", fontSize: 13 }}>
+                    {!loading ? "No data yet — connect your first AI agent" : "Loading..."}
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>

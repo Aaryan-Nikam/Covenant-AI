@@ -118,7 +118,7 @@ async def openai_chat_completions_proxy(
     # Extract text content from OpenAI messages format
     combined_content, segments = _openai_extractor.extract(body)
 
-    # Run through compliance pipeline
+    # Run through compliance pipeline (detect + act only, no internal forwarding)
     try:
         result = await interceptor.process_request(
             content=combined_content,
@@ -129,9 +129,9 @@ async def openai_chat_completions_proxy(
                 "model": body.get("model", "unknown"),
                 "message_count": len(messages),
                 "openai_key_present": bool(x_openai_key),
-                # NEVER log the actual key value
             },
             active_rulesets=tenant.active_rulesets,
+            forward=False,  # Router handles forwarding to capture token data
         )
 
     except ComplianceViolation as e:
@@ -153,10 +153,30 @@ async def openai_chat_completions_proxy(
     )
 
     # Forward sanitized request to real OpenAI
+    import time as _time
+    _fwd_start = _time.monotonic()
     forward_result = await forwarder.forward(
         path="/v1/chat/completions",
         payload=sanitized_body,
         openai_api_key=x_openai_key,
+    )
+    total_latency_ms = result.latency_ms + int((_time.monotonic() - _fwd_start) * 1000)
+
+    # Schedule audit log with token data now that we have upstream response
+    interceptor.schedule_audit_log(
+        agent_id=result.agent_id_raw,
+        request_content=result.raw_content,
+        rulesets_used=result.rulesets_used,
+        detections=result.raw_detections,
+        actions_taken=result.raw_actions_taken,
+        was_blocked=result.was_blocked,
+        target_url="https://api.openai.com/v1/chat/completions",
+        latency_ms=total_latency_ms,
+        outcome=result.status,
+        prompt_tokens=forward_result.prompt_tokens if forward_result.success else None,
+        completion_tokens=forward_result.completion_tokens if forward_result.success else None,
+        total_tokens=forward_result.total_tokens if forward_result.success else None,
+        model=forward_result.model if forward_result.success else body.get("model"),
     )
 
     # Handle upstream errors
@@ -228,6 +248,7 @@ async def anthropic_messages_proxy(
             tenant_id=tenant.id,
             target_url="https://api.anthropic.com/v1/messages",
             active_rulesets=tenant.active_rulesets,
+            forward=False,
         )
     except ComplianceViolation as e:
         raise HTTPException(400, {
@@ -247,6 +268,9 @@ async def anthropic_messages_proxy(
 
     # Forward to Anthropic
     import httpx
+    import time as _time
+    _fwd_start = _time.monotonic()
+    
     async with httpx.AsyncClient(timeout=60.0) as client:
         resp = await client.post(
             "https://api.anthropic.com/v1/messages",
@@ -257,8 +281,60 @@ async def anthropic_messages_proxy(
                 "content-type": "application/json",
             },
         )
+        
+    total_latency_ms = result.latency_ms + int((_time.monotonic() - _fwd_start) * 1000)
+    
+    try:
+        resp_json = resp.json()
+    except Exception:
+        resp_json = {}
 
-    return resp.json()
+    usage = resp_json.get("usage", {})
+    prompt_tokens = usage.get("input_tokens")
+    completion_tokens = usage.get("output_tokens")
+    total_tokens = None
+    if prompt_tokens is not None or completion_tokens is not None:
+        total_tokens = (prompt_tokens or 0) + (completion_tokens or 0)
+        
+    interceptor.schedule_audit_log(
+        agent_id=result.agent_id_raw,
+        request_content=result.raw_content,
+        rulesets_used=result.rulesets_used,
+        detections=result.raw_detections,
+        actions_taken=result.raw_actions_taken,
+        was_blocked=result.was_blocked,
+        target_url="https://api.anthropic.com/v1/messages",
+        latency_ms=total_latency_ms,
+        outcome="success" if resp.is_success else "error",
+        prompt_tokens=prompt_tokens if resp.is_success else None,
+        completion_tokens=completion_tokens if resp.is_success else None,
+        total_tokens=total_tokens if resp.is_success else None,
+        model=body.get("model", "unknown"),
+    )
+
+    if not resp.is_success:
+        raise HTTPException(resp.status_code, resp_json)
+
+    # Detokenize
+    response_content = ""
+    content_blocks = resp_json.get("content", [])
+    for block in content_blocks:
+        if block.get("type") == "text":
+            response_content += block.get("text", "")
+
+    if response_content and getattr(result, "session_token_map", None):
+        detokenized = await interceptor.process_response(
+            response_content=response_content,
+            session_token_map=result.session_token_map,
+            agent_id=tenant.agent_id,
+        )
+        # Update the first text block (simplified for proxy)
+        for block in content_blocks:
+            if block.get("type") == "text":
+                block["text"] = detokenized
+                break
+
+    return resp_json
 
 
 # ---------------------------------------------------------------------------
@@ -298,6 +374,7 @@ async def google_generate_content_proxy(
             tenant_id=tenant.id,
             target_url=f"https://generativelanguage.googleapis.com/v1/models/{model}:generateContent",
             active_rulesets=tenant.active_rulesets,
+            forward=False,
         )
     except ComplianceViolation as e:
         raise HTTPException(400, {
@@ -317,7 +394,10 @@ async def google_generate_content_proxy(
 
     # Forward to Google
     import httpx
+    import time as _time
     target = f"https://generativelanguage.googleapis.com/v1/models/{model}:generateContent"
+    _fwd_start = _time.monotonic()
+    
     async with httpx.AsyncClient(timeout=60.0) as client:
         resp = await client.post(
             target,
@@ -325,8 +405,58 @@ async def google_generate_content_proxy(
             params={"key": x_google_key},
             headers={"content-type": "application/json"},
         )
+        
+    total_latency_ms = result.latency_ms + int((_time.monotonic() - _fwd_start) * 1000)
 
-    return resp.json()
+    try:
+        resp_json = resp.json()
+    except Exception:
+        resp_json = {}
+
+    usage = resp_json.get("usageMetadata", {})
+    prompt_tokens = usage.get("promptTokenCount")
+    completion_tokens = usage.get("candidatesTokenCount")
+    total_tokens = usage.get("totalTokenCount")
+
+    interceptor.schedule_audit_log(
+        agent_id=result.agent_id_raw,
+        request_content=result.raw_content,
+        rulesets_used=result.rulesets_used,
+        detections=result.raw_detections,
+        actions_taken=result.raw_actions_taken,
+        was_blocked=result.was_blocked,
+        target_url=target,
+        latency_ms=total_latency_ms,
+        outcome="success" if resp.is_success else "error",
+        prompt_tokens=prompt_tokens if resp.is_success else None,
+        completion_tokens=completion_tokens if resp.is_success else None,
+        total_tokens=total_tokens if resp.is_success else None,
+        model=model,
+    )
+
+    if not resp.is_success:
+        raise HTTPException(resp.status_code, resp_json)
+
+    # Detokenize
+    candidates = resp_json.get("candidates", [])
+    if candidates:
+        response_content = ""
+        parts = candidates[0].get("content", {}).get("parts", [])
+        for part in parts:
+            response_content += part.get("text", "")
+
+        if response_content and getattr(result, "session_token_map", None):
+            detokenized = await interceptor.process_response(
+                response_content=response_content,
+                session_token_map=result.session_token_map,
+                agent_id=tenant.agent_id,
+            )
+            for part in parts:
+                if "text" in part:
+                    part["text"] = detokenized
+                    break
+
+    return resp_json
 
 
 # ---------------------------------------------------------------------------
@@ -506,6 +636,8 @@ async def check_vault_connection() -> bool:
     """Check vault is accessible. Returns True if reachable."""
     try:
         from engine.vault.key_manager import KeyManager
+        # Health check only — db_session=None is fine for local/hashicorp backends.
+        # AWS KMS health is verified via the in-memory cache or will degrade gracefully.
         km = KeyManager()
         await km.get_current_key()
         return True

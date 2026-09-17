@@ -1,0 +1,15 @@
+client_id: example-client
+chrome_profile_dir: ~/.azmeth-agent/chrome-profile
+downloads_dir: ~/.azmeth-agent/downloads
+evidence_dir: ~/.azmeth-agent/evidence
+run_log_dir: ~/.azmeth-agent/logs
+
+workflows:
+  - name: dripify_csv_upload
+    start_url: https://app.dripify.io/
+    allowed_domains:
+      - dripify.io
+      - app.dripify.io
+    require_confirmation_before_submit: false
+    max_steps: 80
+    max_run_seconds: 600

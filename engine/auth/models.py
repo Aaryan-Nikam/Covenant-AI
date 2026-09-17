@@ -52,6 +52,8 @@ class Tenant(Base):
     )
     # Set on DELETE /v1/admin/tenants/{id}
     deactivated_at = Column(DateTime(timezone=True), nullable=True)
+    notification_email = Column(String(255), nullable=True)
+    webhook_url = Column(String(1024), nullable=True)
 
     api_keys = relationship(
         "TenantAPIKey",

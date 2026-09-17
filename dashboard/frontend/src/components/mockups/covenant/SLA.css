@@ -1,0 +1,117 @@
+/* SLA Monitoring styles — inherits ip-* tokens from global stylesheet */
+
+.sla-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 16px;
+  padding: 4px 0;
+}
+
+.sla-metric-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  transition: box-shadow 0.15s;
+}
+
+.sla-metric-card--breached {
+  border-color: var(--status-blocked-dot);
+  box-shadow: 0 0 0 1px var(--status-blocked-dot)22;
+}
+
+.sla-metric-card--ok {
+  border-color: var(--status-passed-dot);
+}
+
+.sla-metric-card--no_data {
+  opacity: 0.65;
+}
+
+.sla-metric-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.sla-metric-name {
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--text-primary);
+}
+
+.sla-status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.sla-status-dot--ok { background: var(--status-passed-dot); }
+.sla-status-dot--breached { background: var(--status-blocked-dot); }
+.sla-status-dot--no_data { background: var(--text-tertiary); }
+
+.sla-metric-type {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-tertiary);
+}
+
+.sla-metric-value {
+  font-size: 32px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  color: var(--text-primary);
+  line-height: 1.1;
+}
+
+.sla-metric-threshold {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.sla-metric-status-badge {
+  margin-top: 4px;
+}
+
+.sla-metric-ts {
+  font-size: 11px;
+  color: var(--text-tertiary);
+}
+
+/* Form */
+.sla-form {
+  background: var(--bg-card-hover);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.sla-form-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sla-form-row label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.sla-error {
+  color: var(--status-blocked-dot);
+  font-size: 13px;
+  padding: 8px 12px;
+  background: rgba(239, 68, 68, 0.08);
+  border-radius: 6px;
+  border: 1px solid rgba(239, 68, 68, 0.2);
+}

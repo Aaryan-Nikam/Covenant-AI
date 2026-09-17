@@ -10,6 +10,8 @@ type NavPage =
   | "frameworks"
   | "policies"
   | "legal"
+  | "gdpr"
+  | "sla"
   | "guardrails"
   | "agent-security-suite"
   | "gov-analytics"
@@ -19,9 +21,18 @@ type NavPage =
 
 interface AppShellProps {
   children: React.ReactNode;
+  activePage?: NavPage;
+  onNavigate?: (page: NavPage) => void;
 }
 
-const navGroups = [
+type NavItem = {
+  id: NavPage;
+  label: string;
+  badge?: number;
+  accent?: boolean;
+};
+
+const navGroups: { label: string; items: NavItem[] }[] = [
   {
     label: "Core",
     items: [
@@ -37,6 +48,8 @@ const navGroups = [
       { id: "frameworks" as NavPage, label: "Frameworks & Guidelines" },
       { id: "policies" as NavPage, label: "Policies" },
       { id: "legal" as NavPage, label: "Legal" },
+      { id: "gdpr" as NavPage, label: "GDPR Data Rights" },
+      { id: "sla" as NavPage, label: "SLA Monitoring" },
     ],
   },
   {
@@ -57,19 +70,21 @@ const navGroups = [
   },
 ];
 
-export function AppShell({ children }: AppShellProps) {
-  const [activePage, setActivePage] = useState<NavPage>("dashboard");
+export function AppShell({ children, activePage: controlledActivePage, onNavigate }: AppShellProps) {
+  const [internalActivePage, setInternalActivePage] = useState<NavPage>("dashboard");
+  const activePage = controlledActivePage ?? internalActivePage;
 
   useEffect(() => {
     const hash = window.location.hash.slice(1) as NavPage;
     if (hash) {
-      setActivePage(hash);
+      setInternalActivePage(hash);
     }
   }, []);
 
   const handleNavigate = (page: NavPage) => {
     window.location.hash = page;
-    setActivePage(page);
+    setInternalActivePage(page);
+    onNavigate?.(page);
   };
 
   return (

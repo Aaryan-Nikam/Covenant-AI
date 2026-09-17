@@ -197,7 +197,7 @@ def get_interceptor(db: AsyncSession = Depends(get_db)) -> ProxyInterceptor:
     from engine.vault.key_manager import KeyManager
     from engine.vault.vault import TokenVault
 
-    key_manager = KeyManager()
+    key_manager = KeyManager(db_session=db)
     vault = TokenVault(db_session=db, key_manager=key_manager)
 
     executor = ActionExecutor(vault)

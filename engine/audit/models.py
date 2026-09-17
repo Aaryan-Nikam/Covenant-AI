@@ -102,6 +102,14 @@ class AuditLog(Base):
     # Outcome: "passed", "blocked", or "error"
     outcome = Column(String(32), nullable=False)
 
+    # Token usage (for SLA cost tracking)
+    prompt_tokens = Column(Integer, nullable=True)
+    completion_tokens = Column(Integer, nullable=True)
+    total_tokens = Column(Integer, nullable=True)
+    
+    # Model used
+    model = Column(String(128), nullable=True)
+
     # HMAC-SHA256 signature of this entry's content
     hmac_signature = Column(String(128), nullable=False)
 
@@ -121,3 +129,31 @@ class AuditLog(Base):
             f"agent_id='{self.agent_id}', "
             f"outcome='{self.outcome}')>"
         )
+
+
+class FailedAuditLog(Base):
+    """
+    Dead-letter table for audit writes that failed after 3 retries.
+
+    If the primary AuditLog write fails 3 times with exponential backoff,
+    the raw payload and failure reason are persisted here so that:
+    1. No audit event is ever silently dropped.
+    2. Ops can monitor the count as a health metric.
+    3. Failed entries can be replayed into the main audit log later.
+    """
+
+    __tablename__ = "failed_audit_log"
+    __table_args__ = (
+        Index("idx_failed_audit_agent", "agent_id", "created_at"),
+        {"schema": "audit"},
+    )
+
+    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    agent_id = Column(String(128), nullable=False)
+    payload = Column(JSONB, nullable=False)
+    failure_reason = Column(Text, nullable=False)
+    created_at = Column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=datetime.utcnow,
+    )

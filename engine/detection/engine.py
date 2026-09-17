@@ -86,7 +86,7 @@ class DetectionEngine:
             # Optimized inside ner_detector.py to only run spaCy when necessary
             ner_detectors = ruleset.get_ner_detectors()
             if ner_detectors:
-                ner_hits = self.ner_detector.scan(
+                ner_hits = await self.ner_detector.scan(
                     normalized_content, ner_detectors, ruleset_id
                 )
                 if ner_hits:

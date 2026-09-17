@@ -1,0 +1,46 @@
+.gdpr-tabs {
+  display: flex;
+  gap: 16px;
+  padding: 0 24px;
+  border-bottom: 1px solid var(--border-default);
+  margin-bottom: 24px;
+}
+
+.gdpr-tab {
+  background: none;
+  border: none;
+  padding: 12px 4px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s ease;
+}
+
+.gdpr-tab:hover {
+  color: var(--text-primary);
+}
+
+.gdpr-tab.active {
+  color: var(--text-primary);
+  border-bottom-color: var(--status-passed-dot);
+}
+
+.gdpr-section-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 8px;
+}
+
+.gdpr-section-desc {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-bottom: 16px;
+  line-height: 1.5;
+}
+
+.mt-4 {
+  margin-top: 16px;
+}

@@ -6,13 +6,10 @@ builder = "dockerfile"
 dockerfilePath = "Dockerfile.prod"
 
 [deploy]
-# Railway injects $PORT — we use ${PORT:-8000} in the Dockerfile CMD
-# so it works both locally (8000) and on Railway (dynamic)
+# Run migrations then boot — prevents boot-loop on fresh database.
+# Railway injects $PORT; uvicorn reads it via the PORT env var in config.
+startCommand = "alembic -c engine/alembic.ini upgrade head && uvicorn engine.main:app --host 0.0.0.0 --port ${PORT:-8000} --workers 2"
 healthcheckPath = "/health"
 healthcheckTimeout = 30
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 3
-
-# Tables are created via SQLAlchemy Base.metadata.create_all() in
-# the app lifespan (engine/database/connection.py init_db()).
-# No separate migration step required for initial deploy.

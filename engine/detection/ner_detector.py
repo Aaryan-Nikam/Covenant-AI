@@ -56,7 +56,7 @@ class NERDetector:
             )
             self.nlp = None
 
-    def scan(
+    async def scan(
         self,
         content: str,
         detectors: list[DetectorConfig],
@@ -94,7 +94,9 @@ class NERDetector:
 
             # Run spaCy NER — parse doc only once per scan
             if doc is None:
-                doc = self.nlp(content)
+                import asyncio
+                loop = asyncio.get_running_loop()
+                doc = await loop.run_in_executor(None, self.nlp, content)
 
             for ent in doc.ents:
                 # Only process entities matching the detector's entity_class

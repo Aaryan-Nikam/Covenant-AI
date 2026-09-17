@@ -71,6 +71,8 @@ class AMLSignal(Base):
     country_from = Column(String(2), nullable=True)
     country_to = Column(String(2), nullable=True)
     channel = Column(String(32), nullable=True)
+    source = Column(String(50), nullable=False, default="api")
+    raw_excerpt = Column(Text, nullable=True)
     description = Column(Text, nullable=True)
     risk_score = Column(Integer, nullable=False, default=0)
     flags = Column(JSONB, nullable=False, default=list)
@@ -106,6 +108,7 @@ class ComplianceCase(Base):
     closed_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow)
     updated_at = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow)
+    notification_sent_at = Column(DateTime(timezone=True), nullable=True)
 
 
 class SARReport(Base):

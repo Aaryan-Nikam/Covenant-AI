@@ -23,6 +23,7 @@ export interface ComplianceCase {
   created_at: string;
   updated_at: string;
   events: CaseEvent[];
+  source?: string;
 }
 
 export interface CaseEvent {
@@ -36,7 +37,8 @@ export interface CaseEvent {
 export interface SARReport {
   id: string;
   case_id: string;
-  draft_content: string;
+  suspicion_summary: string;
+  narrative: string;
   status: string;        // draft | submitted
   submitted_at?: string;
 }
@@ -71,6 +73,9 @@ export const amlApi = {
 
   generateSARDraft: (caseId: string) =>
     api.post<SARReport>(`/v1/compliance/aml/cases/${caseId}/sar-draft`, {}),
+
+  saveSARDraft: (caseId: string, summary: string, narrative: string) =>
+    api.post<SARReport>(`/v1/compliance/aml/cases/${caseId}/sar-draft`, { suspicion_summary: summary, narrative }),
 
   submitSAR: (caseId: string) =>
     api.post<SARReport>(`/v1/compliance/aml/cases/${caseId}/submit`, {}),

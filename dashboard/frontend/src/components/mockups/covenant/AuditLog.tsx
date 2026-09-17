@@ -11,16 +11,8 @@ import {
 type OutcomeType = "passed" | "masked" | "blocked" | "error";
 
 // ---------------------------------------------------------------------------
-// Fallback mock data (dev mode without backend)
+// No mock data - strict requirement
 // ---------------------------------------------------------------------------
-const MOCK_LOGS = [
-  { entry_id: "log_a1b2c3d4", timestamp: "2026-04-01T14:32:07Z", agent_id: "agent_prod_v2_a9f3", outcome: "masked" as OutcomeType, detections_count: 2, actions_count: 2, was_blocked: false, latency_ms: 142, rulesets_used: ["pci_dss"] },
-  { entry_id: "log_e5f6g7h8", timestamp: "2026-04-01T14:31:54Z", agent_id: "agent_prod_v2_a9f3", outcome: "passed" as OutcomeType, detections_count: 0, actions_count: 0, was_blocked: false, latency_ms: 38, rulesets_used: [] },
-  { entry_id: "log_i9j0k1l2", timestamp: "2026-04-01T14:31:22Z", agent_id: "agent_stg_b7c2_x1", outcome: "blocked" as OutcomeType, detections_count: 3, actions_count: 1, was_blocked: true, latency_ms: 201, rulesets_used: ["hipaa", "pci_dss"] },
-  { entry_id: "log_m3n4o5p6", timestamp: "2026-04-01T14:30:48Z", agent_id: "agent_prod_c4d3", outcome: "masked" as OutcomeType, detections_count: 1, actions_count: 1, was_blocked: false, latency_ms: 97, rulesets_used: ["gdpr"] },
-  { entry_id: "log_q7r8s9t0", timestamp: "2026-04-01T14:30:31Z", agent_id: "agent_prod_v2_a9f3", outcome: "passed" as OutcomeType, detections_count: 0, actions_count: 0, was_blocked: false, latency_ms: 44, rulesets_used: [] },
-  { entry_id: "log_u1v2w3x4", timestamp: "2026-04-01T14:29:55Z", agent_id: "agent_stg_b7c2_x1", outcome: "error" as OutcomeType, detections_count: 0, actions_count: 0, was_blocked: false, latency_ms: 589, rulesets_used: [] },
-];
 
 // ---------------------------------------------------------------------------
 // Sub-components
@@ -89,8 +81,11 @@ export function AuditLog() {
   const [page, setPage] = useState(0);
   const PAGE_SIZE = 50;
 
+  const [apiError, setApiError] = useState(false);
+
   const load = useCallback(async () => {
     setLoading(true);
+    setApiError(false);
     try {
       const resp = await fetchAuditLog({
         limit: PAGE_SIZE,
@@ -102,8 +97,7 @@ export function AuditLog() {
       setTotal(resp.total);
       setApiLive(true);
     } catch {
-      setEntries(MOCK_LOGS as AuditEntry[]);
-      setTotal(MOCK_LOGS.length);
+      setApiError(true);
     } finally {
       setLoading(false);
     }
@@ -132,12 +126,12 @@ export function AuditLog() {
           <div className="ip-page-subtitle">
             Cryptographically signed, tamper-evident record of all proxy traffic
             {apiLive && <span style={{ marginLeft: 8, fontSize: 11, color: "var(--status-passed-dot)" }}>● Live</span>}
-            {!apiLive && !loading && <span style={{ marginLeft: 8, fontSize: 11, color: "var(--text-tertiary)" }}>● Demo mode</span>}
+            {apiError && !loading && <span style={{ marginLeft: 8, fontSize: 11, color: "#EF4444" }}>● Disconnected</span>}
           </div>
         </div>
         <div className="ip-page-header-actions">
           <button className="ip-btn-ghost">Export CSV</button>
-          <button className="ip-btn-ghost" onClick={handleVerify} disabled={verifying}>
+          <button className="ip-btn-ghost" onClick={handleVerify} disabled={verifying || apiError}>
             <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
               <path d="M6.5 1L2 3.5V7.5C2 9.9 4.1 11.9 6.5 12.7C8.9 11.9 11 9.9 11 7.5V3.5L6.5 1Z"
                 stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" fill="none" />
@@ -147,6 +141,15 @@ export function AuditLog() {
         </div>
       </div>
 
+      {apiError && !loading && (
+        <div style={{ margin: "0 24px 16px", padding: "14px 20px", background: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.18)", borderRadius: 8 }}>
+          <span style={{ fontSize: 13, color: "#EF4444", fontWeight: 500 }}>⚠ Backend unreachable</span>
+          <span style={{ fontSize: 12, color: "var(--text-secondary)", marginLeft: 12 }}>
+            Connect your backend to view the audit log.
+          </span>
+        </div>
+      )}
+
       {verifyStatus && (
         <div style={{ margin: "0 24px 16px", padding: "12px 16px", background: "var(--bg-elevated)", borderRadius: 8, fontSize: 13, borderLeft: "3px solid var(--status-passed-dot)" }}>
           {verifyStatus}
@@ -154,7 +157,7 @@ export function AuditLog() {
       )}
 
       <div className="ip-content" style={{ display: "flex", flexDirection: "column" }}>
-        <SummaryBar entries={entries.length ? entries : MOCK_LOGS as AuditEntry[]} />
+        <SummaryBar entries={entries} />
 
         <div className="ip-filter-bar">
           <select
@@ -207,7 +210,13 @@ export function AuditLog() {
                       ))}
                     </tr>
                   ))
-                  : entries.map((e) => (
+                  : entries.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} style={{ textAlign: "center", padding: "40px 0", color: "var(--text-tertiary)", fontSize: 13 }}>
+                        No audit logs found.
+                      </td>
+                    </tr>
+                  ) : entries.map((e) => (
                     <tr key={e.entry_id}>
                       <td><span className="ip-mono" style={{ fontSize: 12 }}>{new Date(e.timestamp).toLocaleString()}</span></td>
                       <td><span className="ip-mono" style={{ fontSize: 11, color: "var(--text-secondary)" }} title={e.agent_id}>{e.agent_id.slice(0, 16)}…</span></td>

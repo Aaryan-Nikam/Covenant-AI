@@ -93,3 +93,29 @@ class VaultToken(Base):
             f"data_type='{self.data_type}', "
             f"agent_id='{self.agent_id}')>"
         )
+
+
+class VaultKey(Base):
+    """
+    Stores KMS-encrypted data key ciphertexts in Postgres.
+
+    Replaces the previous approach of writing .ironpass_kms_{version}.enc
+    files to the local filesystem, which broke multi-container and
+    ephemeral-container deployments.
+
+    The plaintext key is NEVER stored here — only the KMS-encrypted
+    ciphertext blob, which can only be decrypted by calling KMS.
+    """
+
+    __tablename__ = "vault_keys"
+    __table_args__ = (
+        {"schema": "vault"},
+    )
+
+    version = Column(String(32), primary_key=True, nullable=False)
+    encrypted_payload = Column(LargeBinary, nullable=False)
+    created_at = Column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=datetime.utcnow,
+    )

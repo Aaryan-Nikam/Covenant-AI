@@ -89,6 +89,31 @@ async def ingest_aml_signal(
     return await service.ingest_aml_signal(tenant.id, body)
 
 
+@router.get("/aml/signals")
+async def list_aml_signals(
+    source: str | None = Query(default=None),
+    tenant: Tenant = Depends(verify_api_key),
+    db: AsyncSession = Depends(get_db),
+):
+    from engine.compliance.models import AMLSignal
+    from sqlalchemy import select
+    query = select(AMLSignal).where(AMLSignal.tenant_id == tenant.id)
+    if source:
+        query = query.where(AMLSignal.source == source)
+    query = query.order_by(AMLSignal.created_at.desc())
+    results = (await db.execute(query)).scalars().all()
+    return {"total": len(results), "items": [
+        {
+            "id": r.id,
+            "subject_id": r.subject_id,
+            "amount": r.amount,
+            "country_from": r.country_from,
+            "risk_score": r.risk_score,
+            "source": r.source,
+            "created_at": r.created_at
+        } for r in results
+    ]}
+
 @router.get("/aml/cases", response_model=ComplianceCasesResponse)
 async def list_aml_cases(
     status: str | None = Query(default=None),
@@ -122,7 +147,10 @@ async def save_sar_draft(
     db: AsyncSession = Depends(get_db),
 ):
     service = ComplianceOpsService(db)
-    report = await service.upsert_sar_draft(tenant.id, case_id, body)
+    if body.suspicion_summary is None and body.narrative is None:
+        report = await service.generate_sar_draft(tenant.id, case_id)
+    else:
+        report = await service.upsert_sar_draft(tenant.id, case_id, body)
     if report is None:
         raise HTTPException(status_code=404, detail="Case not found")
     return report

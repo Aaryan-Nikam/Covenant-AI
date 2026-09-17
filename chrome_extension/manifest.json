@@ -1,0 +1,34 @@
+{
+  "manifest_version": 3,
+  "name": "Azmeth Dripify Agent",
+  "version": "0.1.4",
+  "description": "AI-driven browser agent control surface for Dripify CSV uploads.",
+  "permissions": [
+    "activeTab",
+    "debugger",
+    "sidePanel",
+    "storage",
+    "tabs"
+  ],
+  "host_permissions": [
+    "http://127.0.0.1/*",
+    "http://localhost/*",
+    "https://app.dripify.io/*",
+    "https://*.dripify.io/*"
+  ],
+  "background": {
+    "service_worker": "src/background.js",
+    "type": "module"
+  },
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  },
+  "action": {
+    "default_title": "Azmeth Dripify Agent"
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}

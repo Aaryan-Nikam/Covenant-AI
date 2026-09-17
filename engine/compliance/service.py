@@ -693,6 +693,8 @@ class ComplianceOpsService:
             flags=score.flags,
             signal_metadata=request.metadata,
             status=status,
+            source=request.source,
+            raw_excerpt=request.raw_excerpt,
             created_at=now,
             updated_at=now,
         )
@@ -738,6 +740,20 @@ class ComplianceOpsService:
             self.db.add(event)
             action = "escalated_to_case"
 
+            if case.priority == "high":
+                from engine.compliance.notifier import send_aml_alert
+                import asyncio
+                asyncio.create_task(send_aml_alert(
+                    tenant_id=tenant_id,
+                    case_id=case.id,
+                    risk_score=case.risk_score,
+                    subject_id=signal.subject_id,
+                    amount=float(signal.amount) if signal.amount else None,
+                    country_from=signal.country_from,
+                    flags=list(signal.flags),
+                    opened_at=case.created_at.isoformat(),
+                ))
+
         logger.info(
             "AML signal processed tenant=%s signal=%s score=%s action=%s",
             tenant_id,
@@ -765,8 +781,9 @@ class ComplianceOpsService:
         if status:
             filters.append(ComplianceCase.status == status)
 
-        base_query = select(ComplianceCase).where(and_(*filters))
-        count_query = select(func.count()).select_from(base_query.subquery())
+        from engine.compliance.models import AMLSignal
+        base_query = select(ComplianceCase, AMLSignal.source).outerjoin(AMLSignal, ComplianceCase.source_signal_id == AMLSignal.id).where(and_(*filters))
+        count_query = select(func.count()).select_from(select(ComplianceCase).where(and_(*filters)).subquery())
         total = (await self.db.execute(count_query)).scalar_one()
 
         rows = (
@@ -776,7 +793,7 @@ class ComplianceOpsService:
                 .limit(limit)
                 .offset(offset)
             )
-        ).scalars().all()
+        ).all()
 
         items = [
             ComplianceCaseSummary(
@@ -824,6 +841,126 @@ class ComplianceOpsService:
             opened_at=row.opened_at,
             updated_at=row.updated_at,
         )
+
+    async def generate_sar_draft(self, tenant_id: str, case_id: str) -> "SARReportResponse | None":
+        from engine.compliance.models import AMLSignal
+        import httpx
+        import json
+
+        # 1. Fetch case, signal
+        case = (await self.db.execute(
+            select(ComplianceCase).where(
+                ComplianceCase.id == case_id,
+                ComplianceCase.tenant_id == tenant_id,
+                ComplianceCase.domain == "aml",
+            )
+        )).scalar_one_or_none()
+
+        if not case or not case.source_signal_id:
+            return None
+
+        signal = (await self.db.execute(
+            select(AMLSignal).where(
+                AMLSignal.id == case.source_signal_id,
+                AMLSignal.tenant_id == tenant_id
+            )
+        )).scalar_one_or_none()
+        
+        if not signal:
+            return None
+
+        # 2. Call Anthropic
+        prompt = f'''You are a compliance officer assistant. Generate a professional SAR (Suspicious Activity Report) draft based on the following case data. Respond with JSON only, no markdown.
+
+Case ID: {case.id}
+Subject ID: {signal.subject_id}
+Transaction Amount: {signal.amount} {signal.currency}
+Country: {signal.country_from}
+Risk Score: {signal.risk_score}/100
+Rules Fired: {signal.flags}
+PEP Match: {True if 'pep_match' in signal.flags else False}
+Case Opened: {case.created_at}
+
+Return JSON with exactly two keys:
+"suspicion_summary": A concise 2-3 sentence summary of why this activity is suspicious.
+"narrative": A detailed 150-200 word narrative suitable for filing with FinCEN, describing the suspicious activity, the subject, the transaction pattern, and the basis for reporting.
+'''
+        suspicion_summary = f"Suspicious activity observed for {signal.subject_id} involving {signal.amount} {signal.currency}."
+        narrative = f"Based on system alerts, case {case.id} was opened for {signal.subject_id}. The activity triggered the following flags: {', '.join(signal.flags)}. Amount involved: {signal.amount}. Country: {signal.country_from}. Further review is required."
+
+        import os
+        api_key = os.environ.get("ANTHROPIC_API_KEY")
+        if api_key:
+            try:
+                async with httpx.AsyncClient(timeout=30.0) as client:
+                    resp = await client.post(
+                        "https://api.anthropic.com/v1/messages",
+                        headers={
+                            "x-api-key": api_key,
+                            "anthropic-version": "2023-06-01",
+                            "content-type": "application/json"
+                        },
+                        json={
+                            "model": "claude-haiku-4-5",
+                            "max_tokens": 1000,
+                            "messages": [{"role": "user", "content": prompt}]
+                        }
+                    )
+                if resp.is_success:
+                    content_text = resp.json().get("content", [])[0].get("text", "{}")
+                    parsed = json.loads(content_text)
+                    if "suspicion_summary" in parsed and "narrative" in parsed:
+                        suspicion_summary = parsed["suspicion_summary"]
+                        narrative = parsed["narrative"]
+            except Exception as e:
+                logger.warning(f"SAR LLM generation failed: {e}. Falling back to template.")
+        
+        now = datetime.now(timezone.utc)
+        report = (await self.db.execute(
+            select(SARReport).where(
+                SARReport.case_id == case_id,
+                SARReport.tenant_id == tenant_id,
+            )
+        )).scalar_one_or_none()
+
+        if report is None:
+            report = SARReport(
+                tenant_id=tenant_id,
+                case_id=case_id,
+                jurisdiction="UK_NCA",
+                status="ai_draft",
+                suspicion_summary=suspicion_summary,
+                narrative=narrative,
+                created_at=now,
+                updated_at=now,
+            )
+            self.db.add(report)
+        else:
+            report.status = "ai_draft"
+            report.suspicion_summary = suspicion_summary
+            report.narrative = narrative
+            report.updated_at = now
+
+        case.status = "in_review"
+        case.updated_at = now
+
+        self.db.add(ComplianceCaseEvent(
+            tenant_id=tenant_id,
+            case_id=case_id,
+            event_type="sar_draft_generated",
+            event_data={"report_id": report.id},
+            created_at=now,
+        ))
+
+        await self.db.flush()
+
+        # Build response manually or reuse standard schema
+        # but upsert_sar_draft uses SARReportResponse which we can return 
+        # wait, we need to return the FULL draft content so the UI can show it.
+        # But SARReportResponse doesn't have suspicion_summary and narrative.
+        # Oh, SARReportResponse in schemas.py has status, but not the text!
+        return report
+
 
     async def upsert_sar_draft(
         self,
@@ -896,6 +1033,8 @@ class ComplianceOpsService:
             submission_reference=report.submission_reference,
             submitted_at=report.submitted_at,
             consent_deadline_at=report.consent_deadline_at,
+            suspicion_summary=report.suspicion_summary,
+            narrative=report.narrative,
         )
 
     async def submit_sar(
@@ -957,6 +1096,8 @@ class ComplianceOpsService:
             submission_reference=report.submission_reference,
             submitted_at=report.submitted_at,
             consent_deadline_at=report.consent_deadline_at,
+            suspicion_summary=report.suspicion_summary,
+            narrative=report.narrative,
         )
 
     async def aml_dashboard(self, tenant_id: str) -> AMLDashboardResponse:

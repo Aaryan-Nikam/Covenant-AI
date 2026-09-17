@@ -38,10 +38,11 @@ class KeyManager:
     _cache_lock = Lock()
     CACHE_TTL_SECONDS = 300  # 5 minutes
 
-    def __init__(self):
+    def __init__(self, db_session=None):
         self.settings = get_settings()
         self.backend = self.settings.key_backend
         self._current_version = "v1"
+        self._db_session = db_session
 
         if self.backend == "local":
             if not self.settings.local_vault_key:
@@ -232,13 +233,12 @@ class KeyManager:
     ) -> tuple[bytes, str]:
         """
         Fetch data key from AWS KMS.
-        Since we cannot store keys in the DB (Rule #3), and KMS doesn't
-        store secrets, we store the KMS-encrypted data key ciphertext
-        in a local file on the EC2 instance for the given version.
+        The KMS-encrypted data key ciphertext is stored in the Postgres
+        `vault_keys` table, not on the local filesystem. This ensures
+        multi-container and ephemeral deployments work correctly.
         """
         import boto3
         import asyncio
-        import os
         from botocore.exceptions import ClientError
         from engine.exceptions import KeyManagementError
 
@@ -254,17 +254,25 @@ class KeyManager:
 
         kms_key_id = self.settings.aws_kms_key_id
         region = getattr(self.settings, "aws_region", "us-east-1")
-        
-        # Path to store the encrypted data key for this version
-        key_file_path = f".ironpass_kms_{key_version}.enc"
 
-        def _fetch_or_generate():
-            client = boto3.client("kms", region_name=region)
-            
-            # If we already generated a key for this version, decrypt it
-            if os.path.exists(key_file_path):
-                with open(key_file_path, "rb") as f:
-                    ciphertext = f.read()
+        # Try to load the encrypted ciphertext from Postgres
+        ciphertext = None
+        if self._db_session is not None:
+            from engine.vault.models import VaultKey
+            from sqlalchemy import select
+            result = await self._db_session.execute(
+                select(VaultKey.encrypted_payload).where(
+                    VaultKey.version == key_version
+                )
+            )
+            row = result.scalar_one_or_none()
+            if row is not None:
+                ciphertext = bytes(row)
+
+        if ciphertext is not None:
+            # Decrypt the stored ciphertext via KMS
+            def _decrypt():
+                client = boto3.client("kms", region_name=region)
                 try:
                     response = client.decrypt(
                         CiphertextBlob=ciphertext,
@@ -275,33 +283,54 @@ class KeyManager:
                 except ClientError as e:
                     raise KeyManagementError(f"AWS KMS decryption failed: {e}")
 
-            # Otherwise, generate a new data key
+            loop = asyncio.get_running_loop()
+            key_bytes, key_ver = await loop.run_in_executor(None, _decrypt)
+
+            with KeyManager._cache_lock:
+                KeyManager._cache[key_ver] = (key_bytes, key_ver, time.time())
+
+            return key_bytes, key_ver
+
+        # No stored key — generate a new data key and persist to Postgres
+        def _generate():
+            client = boto3.client("kms", region_name=region)
             try:
                 response = client.generate_data_key(
                     KeyId=kms_key_id,
                     NumberOfBytes=32
                 )
                 plaintext = response["Plaintext"]
-                ciphertext = response["CiphertextBlob"]
-                
-                # Save ciphertext to disk so other workers/restarts can use the same key
-                with open(key_file_path, "wb") as f:
-                    f.write(ciphertext)
-                    
+                ct = response["CiphertextBlob"]
                 logger.info(f"AWS KMS: generated new data key for version={key_version}")
-                return plaintext, key_version
-                
+                return plaintext, ct
             except ClientError as e:
                 raise KeyManagementError(f"AWS KMS generate_data_key failed: {e}")
 
-        # Run boto3 calls in an executor since they are synchronous HTTP requests
         loop = asyncio.get_running_loop()
         try:
-            key_bytes, key_ver = await loop.run_in_executor(None, _fetch_or_generate)
-            
+            key_bytes, new_ciphertext = await loop.run_in_executor(None, _generate)
+
+            # Persist the encrypted ciphertext to Postgres
+            if self._db_session is not None:
+                from engine.vault.models import VaultKey
+                vault_key = VaultKey(
+                    version=key_version,
+                    encrypted_payload=new_ciphertext,
+                )
+                self._db_session.add(vault_key)
+                await self._db_session.flush()
+                logger.info(f"AWS KMS: stored encrypted data key in Postgres for version={key_version}")
+            else:
+                logger.warning(
+                    "AWS KMS: no db_session provided — encrypted data key NOT persisted. "
+                    "This key will be lost on restart."
+                )
+
             with KeyManager._cache_lock:
-                KeyManager._cache[key_ver] = (key_bytes, key_ver, time.time())
-                
-            return key_bytes, key_ver
+                KeyManager._cache[key_version] = (key_bytes, key_version, time.time())
+
+            return key_bytes, key_version
+        except KeyManagementError:
+            raise
         except Exception as e:
             raise KeyManagementError(f"AWS KMS error: {e}")

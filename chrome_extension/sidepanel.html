@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Azmeth Agent</title>
+    <link rel="stylesheet" href="src/sidepanel.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header class="topbar">
+        <div>
+          <div class="eyebrow">Azmeth Agent</div>
+          <h1>Dripify Uploads</h1>
+        </div>
+        <button id="refreshJobs" class="icon-button" title="Refresh jobs">↻</button>
+      </header>
+
+      <section class="panel">
+        <label class="field">
+          <span>Agent Ops API</span>
+          <input id="apiBaseUrl" type="url" spellcheck="false" />
+        </label>
+        <button id="saveSettings" class="button secondary">Save</button>
+      </section>
+
+      <section class="metrics">
+        <div>
+          <span id="queuedCount">0</span>
+          <label>Queued</label>
+        </div>
+        <div>
+          <span id="runningCount">0</span>
+          <label>Running</label>
+        </div>
+        <div>
+          <span id="completedCount">0</span>
+          <label>Done</label>
+        </div>
+      </section>
+
+      <section class="panel jobs-panel">
+        <div class="section-title">
+          <h2>Processed CSV Jobs</h2>
+          <span id="jobTotal">0 jobs</span>
+        </div>
+        <div id="jobList" class="job-list"></div>
+      </section>
+
+      <section class="panel">
+        <div class="section-title">
+          <h2>Selected Job</h2>
+          <span id="selectedStatus">None</span>
+        </div>
+        <dl class="details">
+          <dt>Campaign</dt>
+          <dd id="selectedCampaign">-</dd>
+          <dt>CSV</dt>
+          <dd id="selectedCsv">-</dd>
+          <dt>Columns</dt>
+          <dd id="selectedColumns">-</dd>
+        </dl>
+        <button id="runAgent" class="button primary">Run Upload Agent</button>
+        <p id="agentStatus" class="status-text">Select a queued job, then run the agent on the Dripify tab.</p>
+      </section>
+
+      <div id="toast" class="toast" hidden></div>
+    </main>
+    <script src="src/sidepanel.js" type="module"></script>
+  </body>
+</html>

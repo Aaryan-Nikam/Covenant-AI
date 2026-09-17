@@ -161,21 +161,9 @@ class ProxyInterceptor:
             # the provider-specific HTTP response shape.
             raise
 
-        # ---- STEP 4: LOG (fire-and-forget — never blocks response) ----
+        # ---- STEP 4: LOG scheduled by router after forwarding (to capture token data) ----
         latency_ms = int((time.monotonic() - start_time) * 1000)
-
-        asyncio.create_task(self._log_audit(
-            agent_id=agent_id,
-            request_content=content,
-            rulesets_used=active_rulesets,
-            detections=detections,
-            actions_taken=actions_taken,
-            was_blocked=was_blocked,
-            target_url=target_url,
-            latency_ms=latency_ms,
-            outcome=outcome,
-        ))
-        audit_entry_id = None  # Not available immediately; logged asynchronously
+        audit_entry_id = None  # Will be set asynchronously when router calls schedule_audit_log
 
         # Build response
         detection_summaries = [
@@ -213,10 +201,50 @@ class ProxyInterceptor:
             sanitized_content=result.modified_content if 'result' in locals() else content,
             request_hash=request_hash,
             rulesets_used=active_rulesets,
-            was_blocked=False,
+            was_blocked=was_blocked,
             session_id=session_id,
             session_token_map=result.session_token_map if 'result' in locals() else {},
+            raw_detections=detections,
+            raw_actions_taken=actions_taken,
+            raw_content=content,
+            agent_id_raw=agent_id,
         )
+
+    def schedule_audit_log(
+        self,
+        agent_id: str,
+        request_content: str,
+        rulesets_used: list[str],
+        detections: list,
+        actions_taken: list,
+        was_blocked: bool,
+        target_url: str | None,
+        latency_ms: int,
+        outcome: str,
+        prompt_tokens: int | None = None,
+        completion_tokens: int | None = None,
+        total_tokens: int | None = None,
+        model: str | None = None,
+    ) -> None:
+        """
+        Fire-and-forget audit log task. Call from the router after forwarding
+        when token data from the upstream response is available.
+        """
+        asyncio.create_task(self._log_audit(
+            agent_id=agent_id,
+            request_content=request_content,
+            rulesets_used=rulesets_used,
+            detections=detections,
+            actions_taken=actions_taken,
+            was_blocked=was_blocked,
+            target_url=target_url,
+            latency_ms=latency_ms,
+            outcome=outcome,
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+            total_tokens=total_tokens,
+            model=model,
+        ))
 
     async def _forward(
         self,
@@ -279,29 +307,150 @@ class ProxyInterceptor:
         target_url: str | None,
         latency_ms: int,
         outcome: str,
+        prompt_tokens: int | None = None,
+        completion_tokens: int | None = None,
+        total_tokens: int | None = None,
+        model: str | None = None,
     ) -> str | None:
         """
         Log to audit trail. Runs as background task.
         Never blocks the proxy response (Critical Rule #6).
-        Returns entry_id or None on failure.
+
+        Retries 3 times with exponential backoff (1s, 2s, 4s).
+        Uses a fresh DB session because the request session may have already closed.
+        Also inserts PiiDataRecord for GDPR module.
         """
+        last_error: Exception | None = None
+        backoff_delays = [1, 2, 4]  # seconds
+
+        from engine.database.connection import get_session_factory
+        from engine.audit.logger import AuditLogger
+        from engine.auth.models import Tenant
+        from engine.gdpr.models import PiiDataRecord
+        from sqlalchemy import select
+        from datetime import datetime, timezone, timedelta
+
+        session_factory = get_session_factory()
+
+        for attempt in range(3):
+            try:
+                async with session_factory() as session:
+                    # 1. Fetch tenant_id for GDPR
+                    tenant = (await session.execute(
+                        select(Tenant.id).where(Tenant.agent_id == agent_id)
+                    )).scalar_one_or_none()
+                    
+                    if not tenant:
+                        logger.error(f"Tenant not found for agent_id={agent_id} during audit log")
+                        return None
+                    
+                    # 2. Write AuditLog using a fresh logger bound to this session
+                    background_audit_logger = AuditLogger(session)
+                    entry_id = await background_audit_logger.log_request(
+                        agent_id=agent_id,
+                        request_content=request_content,
+                        rulesets_used=rulesets_used,
+                        detections=detections,
+                        actions_taken=actions_taken,
+                        was_blocked=was_blocked,
+                        target_url=target_url,
+                        latency_ms=latency_ms,
+                        outcome=outcome,
+                        prompt_tokens=prompt_tokens,
+                        completion_tokens=completion_tokens,
+                        total_tokens=total_tokens,
+                        model=model,
+                    )
+                    
+                    # 3. Write PiiDataRecords for GDPR module
+                    # We iterate over actions_taken because they contain the replacement/mask
+                    retention_until = datetime.now(timezone.utc) + timedelta(days=30) # Default 30d retention
+                    
+                    for action in actions_taken:
+                        if action.action in ("mask", "tokenize", "pseudonymize"):
+                            pii_record = PiiDataRecord(
+                                tenant_id=tenant,
+                                audit_log_id=0,  # Soft link
+                                entity_type=action.data_type,
+                                masked_value=action.replacement,
+                                processing_purpose="AI Model Proxy Inference",
+                                legal_basis="Legitimate Interest",
+                                # Hash the original value to get a deterministic subject ID for erasure
+                                # Normally this would come from a JWT or auth context, but for proxy we hash the actual PII
+                                # Wait, we don't have the original value in action! It's stripped.
+                                # But we can extract it from request_content using original_position!
+                                data_subject_id="hashed_subject", # We will implement hashing below
+                                retention_until=retention_until,
+                            )
+                            # Extract original value using position
+                            start, end = action.original_position
+                            original_val = request_content[start:end]
+                            import hashlib
+                            pii_record.data_subject_id = hashlib.sha256(original_val.encode('utf-8')).hexdigest()
+                            
+                            session.add(pii_record)
+
+                    from engine.detection.aml_extractor import AMLExtractor
+                    candidate = AMLExtractor().extract(request_content)
+                    if candidate:
+                        from engine.compliance.service import ComplianceOpsService
+                        from engine.compliance.schemas import AMLSignalIngestRequest
+                        svc = ComplianceOpsService(session)
+                        await svc.ingest_aml_signal(tenant, AMLSignalIngestRequest(
+                            subject_id=f"proxy-{agent_id}",
+                            amount=candidate.amount,
+                            country_from=candidate.country_from or "XX",
+                            pep_hit=candidate.pep_hit,
+                            source="proxy_intercept",
+                            raw_excerpt=candidate.raw_excerpt[:500]
+                        ))
+
+                    await session.commit()
+                    return entry_id
+            except Exception as e:
+                last_error = e
+                logger.warning(
+                    f"Audit logging attempt {attempt + 1}/3 failed: {e}"
+                )
+                if attempt < 2:
+                    await asyncio.sleep(backoff_delays[attempt])
+
+        # All 3 attempts failed — write to dead-letter table
+        logger.error(
+            f"Audit logging failed after 3 attempts for agent={agent_id}. "
+            f"Writing to FailedAuditLog dead-letter table."
+        )
         try:
-            entry_id = await self.audit_logger.log_request(
-                agent_id=agent_id,
-                request_content=request_content,
-                rulesets_used=rulesets_used,
-                detections=detections,
-                actions_taken=actions_taken,
-                was_blocked=was_blocked,
-                target_url=target_url,
-                latency_ms=latency_ms,
-                outcome=outcome,
+            from engine.audit.models import FailedAuditLog
+            from engine.database.connection import get_session_factory
+
+            payload = {
+                "agent_id": agent_id,
+                "rulesets_used": rulesets_used,
+                "detections_count": len(detections),
+                "actions_count": len(actions_taken),
+                "was_blocked": was_blocked,
+                "target_url": target_url,
+                "latency_ms": latency_ms,
+                "outcome": outcome,
+            }
+            session_factory = get_session_factory()
+            async with session_factory() as fallback_session:
+                fallback_session.add(FailedAuditLog(
+                    agent_id=agent_id,
+                    payload=payload,
+                    failure_reason=str(last_error),
+                ))
+                await fallback_session.commit()
+            logger.info("Failed audit entry persisted to dead-letter table.")
+        except Exception as fallback_err:
+            # Absolute last resort — log to stdout so it's captured by
+            # container log aggregators (CloudWatch, Datadog, etc.)
+            logger.critical(
+                f"AUDIT DEAD-LETTER WRITE ALSO FAILED: {fallback_err}. "
+                f"Original error: {last_error}. "
+                f"agent_id={agent_id} outcome={outcome}"
             )
-            return entry_id
-        except Exception as e:
-            # Audit failure should NEVER block the proxy
-            logger.error(f"Audit logging failed (non-blocking): {e}")
-            return None
 
     async def process_response(
         self,

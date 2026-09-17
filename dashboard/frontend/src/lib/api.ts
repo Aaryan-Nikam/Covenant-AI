@@ -1006,3 +1006,46 @@ export async function auditMemorySession(
     body: JSON.stringify(payload),
   });
 }
+
+// ---------------------------------------------------------------------------
+// SLA Monitoring
+// ---------------------------------------------------------------------------
+
+export async function fetchSLAPolicies() {
+  return apiFetch<any>("/sla/policies");
+}
+
+export async function createSLAPolicy(body: {
+  name: string;
+  metric_type: string;
+  threshold_value: number;
+  window_minutes: number;
+  notification_email?: string;
+  webhook_url?: string;
+  is_active: boolean;
+}) {
+  return apiFetch<any>("/sla/policies", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export async function updateSLAPolicy(policyId: string, body: Record<string, any>) {
+  return apiFetch<any>(`/sla/policies/${policyId}`, {
+    method: "PATCH",
+    body: JSON.stringify(body),
+  });
+}
+
+export async function deleteSLAPolicy(policyId: string) {
+  return apiFetch<any>(`/sla/policies/${policyId}`, { method: "DELETE" });
+}
+
+export async function fetchSLABreaches(status?: "open" | "resolved") {
+  const qs = status ? `?status=${status}` : "";
+  return apiFetch<any>(`/sla/breaches${qs}`);
+}
+
+export async function fetchSLALiveMetrics() {
+  return apiFetch<any>("/sla/metrics/live");
+}

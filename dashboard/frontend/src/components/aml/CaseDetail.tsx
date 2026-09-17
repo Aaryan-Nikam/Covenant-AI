@@ -55,7 +55,7 @@ export function CaseDetail({ caseId }: { caseId: string }) {
   if (!caseData) return null;
 
   const canGenerateSAR = caseData.status === 'open' || caseData.status === 'in_review';
-  const canSubmit = sar?.status === 'draft' && caseData.status !== 'submitted';
+  const canSubmit = (sar?.status === 'draft' || sar?.status === 'ai_draft') && caseData.status !== 'submitted';
 
   return (
     <div className="flex flex-col h-full overflow-y-auto">
@@ -112,6 +112,7 @@ export function CaseDetail({ caseId }: { caseId: string }) {
             canSubmit={canSubmit}
             submitting={submitting}
             onSubmit={handleSubmitSAR}
+            onUpdate={setSAR}
           />
         )}
 

@@ -19,6 +19,8 @@ class AMLSignalIngestRequest(BaseModel):
     sanction_hit: bool = False
     unusual_pattern: bool = False
     new_customer: bool = False
+    source: str = "api"
+    raw_excerpt: str | None = None
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -38,6 +40,7 @@ class ComplianceCaseSummary(BaseModel):
     summary: str | None
     status: str
     priority: str
+    source: str | None = None
     risk_score: int
     opened_at: datetime
     updated_at: datetime
@@ -49,8 +52,8 @@ class ComplianceCasesResponse(BaseModel):
 
 
 class SARDraftRequest(BaseModel):
-    suspicion_summary: str
-    narrative: str
+    suspicion_summary: str | None = None
+    narrative: str | None = None
     report_payload: dict[str, Any] = Field(default_factory=dict)
     jurisdiction: str = "UK_NCA"
 
@@ -63,6 +66,8 @@ class SARReportResponse(BaseModel):
     submission_reference: str | None = None
     submitted_at: datetime | None = None
     consent_deadline_at: datetime | None = None
+    suspicion_summary: str | None = None
+    narrative: str | None = None
 
 
 class SARSubmitRequest(BaseModel):

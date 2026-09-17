@@ -33,7 +33,10 @@ class ForwardResult:
     latency_ms: int
     error_type: str | None        # None on success
     error_message: str | None     # None on success
-
+    prompt_tokens: int | None = None
+    completion_tokens: int | None = None
+    total_tokens: int | None = None
+    model: str | None = None
 
 class OpenAIForwarder:
 
@@ -67,14 +70,21 @@ class OpenAIForwarder:
                 )
 
                 latency_ms = int((time.monotonic() - start_time) * 1000)
-
+                resp_json = response.json()
+                
+                usage = resp_json.get("usage", {})
+                
                 return ForwardResult(
                     success=True,
-                    response_body=response.json(),
+                    response_body=resp_json,
                     status_code=response.status_code,
                     latency_ms=latency_ms,
                     error_type=None,
                     error_message=None,
+                    prompt_tokens=usage.get("prompt_tokens"),
+                    completion_tokens=usage.get("completion_tokens"),
+                    total_tokens=usage.get("total_tokens"),
+                    model=resp_json.get("model")
                 )
 
             except httpx.TimeoutException:

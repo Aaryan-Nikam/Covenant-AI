@@ -121,11 +121,37 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"Ruleset loading failed: {e}")
 
+    # Start GDPR Background Scheduler
+    try:
+        from engine.gdpr.scheduler import start_gdpr_scheduler
+        gdpr_scheduler = start_gdpr_scheduler()
+        logger.info("GDPR retention scheduler started")
+    except Exception as e:
+        logger.warning(f"Failed to start GDPR scheduler: {e}")
+        gdpr_scheduler = None
+
+    # Start SLA Evaluation Scheduler
+    try:
+        from engine.sla.scheduler import start_sla_scheduler
+        sla_scheduler = start_sla_scheduler()
+    except Exception as e:
+        logger.warning(f"Failed to start SLA scheduler: {e}")
+        sla_scheduler = None
+
     logger.info("Ironpass is ready")
     yield
 
     # ---- Shutdown ----
     logger.info("Ironpass shutting down...")
+
+    if gdpr_scheduler:
+        gdpr_scheduler.shutdown()
+        logger.info("GDPR retention scheduler shut down")
+
+    if sla_scheduler:
+        sla_scheduler.shutdown()
+        logger.info("SLA evaluation scheduler shut down")
+        
     await close_db()
     logger.info("Database connections closed")
 
@@ -218,6 +244,18 @@ app.include_router(decisions_router, tags=["decisions"])
 # Tenant deletion router
 from engine.deletion.router import router as deletion_router  # noqa: E402
 app.include_router(deletion_router, tags=["deletion"])
+
+# Agent operations router (local desktop upload queue + n8n webhook)
+from engine.agent_ops.router import router as agent_ops_router  # noqa: E402
+app.include_router(agent_ops_router, tags=["agent-ops"])
+
+# GDPR Data Rights router
+from engine.gdpr.router import router as gdpr_router  # noqa: E402
+app.include_router(gdpr_router, tags=["gdpr"])
+
+# SLA Monitoring router
+from engine.sla.router import router as sla_router  # noqa: E402
+app.include_router(sla_router, tags=["sla"])
 
 # Dashboard router
 try:

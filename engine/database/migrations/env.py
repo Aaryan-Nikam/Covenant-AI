@@ -27,8 +27,10 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from engine.database.base import Base
 # Import all models so they register with Base.metadata
 from engine.auth.models import Tenant, TenantAPIKey
-from engine.audit.models import AuditLog
-from engine.vault.models import VaultToken
+from engine.audit.models import AuditLog, FailedAuditLog
+from engine.gdpr.models import PiiDataRecord, ErasureRequest
+from engine.vault.models import VaultToken, VaultKey
+from engine.sla.models import SLAPolicy, SLABreach
 from engine.compliance.models import (
     AMLSignal,
     ComplianceCase,

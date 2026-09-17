@@ -326,7 +326,7 @@ async def delete_tenant(
     # Step 2: Invalidate all vault tokens for this tenant
     # Wipes all encrypted PII from the vault — no dangling tokens after offboarding
     try:
-        key_manager = KeyManager()
+        key_manager = KeyManager(db_session=db)
         vault = TokenVault(db_session=db, key_manager=key_manager)
         invalidated_count = await vault.invalidate_by_tenant(
             tenant_id, reason="tenant_deleted"

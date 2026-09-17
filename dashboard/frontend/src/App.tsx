@@ -21,6 +21,9 @@ import { Legal } from "./components/mockups/covenant/Legal";
 import { GovAnalytics } from "./components/mockups/covenant/GovAnalytics";
 import { FunctionsAndTools } from "./components/mockups/covenant/FunctionsAndTools";
 import { IndustrySuites } from "./components/mockups/covenant/IndustrySuites";
+import { GDPR } from "./components/mockups/covenant/GDPR";
+import { SLA } from "./components/mockups/covenant/SLA";
+import { AgentOpsPage } from "./pages/AgentOpsPage";
 
 function App() {
   const [route, setRoute] = useState(() => window.location.hash.slice(1) || "login");
@@ -35,7 +38,7 @@ function App() {
     case "login": return <Login />;
     case "workspaces": return <Workspaces />;
     case "compliance-layer": return <ComplianceLayer />;
-    case "operations-functions": return <OperationsFunctions />;
+    case "operations-functions": return <FunctionsAndTools />;
     case "agent-security-suite": return <AgentSecuritySuite />;
     case "dashboard": return <Dashboard />;
     case "audit": return <AuditLog />;
@@ -52,9 +55,12 @@ function App() {
     case "settings": return <Settings />;
     case "aml": return <AMLPage />;
     case "legal": return <Legal />;
+    case "gdpr": return <GDPR />;
+    case "sla": return <SLA />;
     case "gov-analytics": return <GovAnalytics />;
     case "functions-tools": return <FunctionsAndTools />;
     case "industry-suites": return <IndustrySuites />;
+    case "agent-ops": return <AgentOpsPage />;
     default: return <Login />;
   }
 }

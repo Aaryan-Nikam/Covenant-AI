@@ -114,6 +114,13 @@ class ProxyResponse(BaseModel):
     session_id: str = ""
     session_token_map: dict | None = None
 
+    # Raw objects preserved for router to call schedule_audit_log with token data
+    # These are excluded from serialization (Any type, not serialized to clients)
+    raw_detections: list = []
+    raw_actions_taken: list = []
+    raw_content: str = ""
+    agent_id_raw: str = ""
+
 class BlockedResponse(BaseModel):
     error: str
     data_type: str
